@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id         String     @id @default(cuid())
+  email      String     @unique
+  name       String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  businesses Business[]
+}
+
+model Business {
+  id          String       @id @default(cuid())
+  name        String
+  userId      String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  apiKeys     ApiKey[]
+  user        User         @relation(fields: [userId], references: [id])
+  leads       Lead[]
+  metaConfigs MetaConfig[]
+  sales       Sale[]
+}
+
+model ApiKey {
+  id         String   @id @default(cuid())
+  key        String   @unique
+  businessId String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  business   Business @relation(fields: [businessId], references: [id])
+}
+
+model Lead {
+  id                     String             @id @default(cuid())
+  businessId             String
+  phone                  String
+  phoneNormalized        String
+  customerName           String?
+  stage                  String?
+  conversationId         String?
+  country                String?
+  adUrl                  String?
+  metaEventId            String?
+  metaStatus             String?
+  metaResponse           String?
+  metaError              String?
+  intentosReintento      Int                @default(0)
+  requiereRevisionManual Boolean            @default(false)
+  fechaEnvioMeta         DateTime?
+  whatsappId             String?
+  ctwaClid               String?
+  campaignId             String?
+  campaignName           String?
+  adsetId                String?
+  adsetName              String?
+  adId                   String?
+  adName                 String?
+  adHeadline             String?
+  metadata               String?
+  createdAt              DateTime           @default(now())
+  isConverted            String?
+  matches                AttributionMatch[]
+  business               Business           @relation(fields: [businessId], references: [id])
+}
+
+model Sale {
+  id                     String             @id @default(cuid())
+  businessId             String
+  externalId             String?
+  amount                 Float
+  currency               String             @default("CLP")
+  phone                  String
+  phoneNormalized        String
+  customerName           String?
+  stage                  String?
+  conversationId         String?
+  country                String?
+  isConverted            String?
+  adUrl                  String?
+  metaEventId            String?
+  metaStatus             String?
+  metaResponse           String?
+  metaError              String?
+  intentosReintento      Int                @default(0)
+  requiereRevisionManual Boolean            @default(false)
+  fechaEnvioMeta         DateTime?
+  whatsappId             String?
+  ctwaClid               String?
+  paymentStatus          String             @default("pending")
+  attributionStatus      String             @default("no_match")
+  isScalable             Boolean            @default(false)
+  capiStatus             String             @default("pending")
+  metadata               String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  adId                   String?
+  adName                 String?
+  adHeadline             String?
+  adsetId                String?
+  adsetName              String?
+  campaignId             String?
+  campaignName           String?
+  matches                AttributionMatch[]
+  capiEvents             CapiEvent[]
+  business               Business           @relation(fields: [businessId], references: [id])
+}
+
+model AttributionMatch {
+  id         String   @id @default(cuid())
+  saleId     String
+  leadId     String
+  matchScore Int
+  matchType  String
+  createdAt  DateTime @default(now())
+  lead       Lead     @relation(fields: [leadId], references: [id])
+  sale       Sale     @relation(fields: [saleId], references: [id])
+}
+
+model MetaConfig {
+  id                String   @id @default(cuid())
+  businessId        String
+  pixelId           String
+  accessToken       String
+  testEventCode     String?
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  businessManagerId String?
+  datasetId         String?
+  adminName         String?
+  phoneNumber       String?
+  chatwootUrl       String?
+  inboxId           String?
+  business          Business @relation(fields: [businessId], references: [id])
+}
+
+model CapiEvent {
+  id         String    @id @default(cuid())
+  saleId     String
+  eventId    String    @unique
+  payload    String
+  response   String?
+  httpStatus Int?
+  error      String?
+  status     String    @default("pending")
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+  sale       Sale      @relation(fields: [saleId], references: [id])
+}
+
+model N8nWorkflowLog {
+  id           String   @id @default(cuid())
+  workflowId   String?
+  workflowName String?
+  executionId  String?
+  status       String
+  payload      String?
+  error        String?
+  createdAt    DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String   @default("info")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+model AlertConfig {
+  id               String   @id @default(cuid())
+  telegramBotToken String?
+  telegramChatId   String?
+  whatsappEnabled  Boolean  @default(false)
+  telegramEnabled  Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model AdPerformance {
+  id              String   @id @default(cuid())
+  adId            String
+  adName          String?
+  date            DateTime
+  spend           Float    @default(0)
+  impressions     Int      @default(0)
+  clicks          Int      @default(0)
+  metaConversions Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@unique([adId, date])
+}

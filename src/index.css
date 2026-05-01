@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-cyber: "Orbitron", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-background: #000000;
+  --color-foreground: #ffffff;
+  
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 1rem;
+}
+
+@layer base {
+  body {
+    @apply font-sans antialiased bg-slate-950 text-slate-100 selection:bg-blue-500/40 overflow-x-hidden;
+    background-color: #020617;
+  }
+
+  body::after {
+    content: "";
+    @apply fixed inset-0 pointer-events-none z-50 opacity-[0.05];
+    background-image: 
+      linear-gradient(rgba(30, 41, 59, 0) 50%, rgba(15, 23, 42, 0.25) 50%),
+      linear-gradient(90deg, rgba(59, 130, 246, 0.06), rgba(30, 58, 138, 0.02), rgba(37, 99, 235, 0.06));
+    background-size: 100% 3px, 3px 100%;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-cyber tracking-widest text-white uppercase;
+  }
+}
+
+@layer utilities {
+  .cyber-grid {
+    background-image: 
+      radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0);
+    background-size: 32px 32px;
+  }
+
+  .neon-text-blue {
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.5), 0 0 20px rgba(59, 130, 246, 0.2);
+  }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .neon-text-red {
+    text-shadow: 0 0 10px rgba(239, 68, 68, 0.5), 0 0 20px rgba(239, 68, 68, 0.2);
+  }
+
+  .cyber-card {
+    @apply bg-slate-900/80 backdrop-blur-md border border-slate-800 relative transition-all duration-300;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+  }
+
+  .cyber-card:hover {
+    @apply border-blue-500/30 bg-blue-500/[0.02];
+  }
+
+  .cyber-border-blue {
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+  }
+}
+
