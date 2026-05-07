@@ -874,6 +874,8 @@ async function startServer() {
           revisionManual: revisionManualCount,
           metaConversions: adPerformance._sum.metaConversions || 0,
           ticketPromedio: ticketPromedio.toFixed(0),
+          leadsCount,
+          conversionRate: leadsCount > 0 ? ((salesCount / leadsCount) * 100).toFixed(1) : "0.0",
           topProducts: topProducts.map(p => ({ name: p.adName, count: p._count._all }))
         },
         recentLeads,

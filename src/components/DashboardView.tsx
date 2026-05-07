@@ -24,6 +24,8 @@ interface DashboardData {
     scalableAds: number;
     revisionManual: number;
     ticketPromedio: string;
+    leadsCount: number;
+    conversionRate: string;
     topProducts: { name: string; count: number }[];
   };
   recentLeads: any[];
@@ -118,14 +120,14 @@ export function DashboardView() {
   const huds = [
     { label: "Ventas Totales", value: summary.salesToday, sub: "Registradas hoy", icon: <TrendingUp />, color: "blue", isMoney: false },
     { label: "Ingresos", value: summary.totalAmount, sub: "Ventas netas", icon: <DollarSign />, color: "blue", isMoney: true },
+    { label: "Leads Captados", value: summary.leadsCount ?? 0, sub: `${summary.conversionRate ?? "0.0"}% conversión`, icon: <Target />, color: "blue", isMoney: false },
     { label: "Atribuidas", value: summary.attributedSales, sub: `${summary.matchRate}% de éxito`, icon: <Target />, color: "blue", isMoney: false },
     { label: "Enviadas Meta", value: summary.sentToMeta, sub: "Sin errores CAPI", icon: <Send />, color: "blue", isMoney: false },
     { label: "Discrepancia", value: `${summary.capiGapPercent}%`, sub: `${summary.notSentToMeta} sin reportar`, icon: <AlertTriangle />, color: Number(summary.capiGapPercent) > 15 ? "red" : "blue", isMoney: false },
     { label: "ROAS Real", value: `${summary.roasReal}x`, sub: `Meta: ${summary.metaConversions}`, icon: <ShieldCheck />, color: "blue", isMoney: false },
     { label: "CPA", value: summary.cpaReal, sub: "Costo por venta", icon: <Activity />, color: "blue", isMoney: true },
     { label: "Ads Escalables", value: summary.scalableAds, sub: "Buen rendimiento", icon: <Zap />, color: "blue", isMoney: false },
-    { label: "En Revisión", value: summary.revisionManual, sub: "Conflictos datos", icon: <AlertTriangle />, color: summary.revisionManual > 0 ? "red" : "blue", isMoney: false },
-    { label: "Gasto", value: summary.spend, sub: "Meta Ads (Hoy)", icon: <Database />, color: "blue", isMoney: true },
+    { label: "Gasto", value: summary.spend, sub: "Meta Ads", icon: <Database />, color: "blue", isMoney: true },
   ];
 
   return (
