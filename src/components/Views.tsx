@@ -35,15 +35,18 @@ function TechnicalInspector({ data, onClose }: { data: any, onClose: () => void 
       ]
     },
     {
-      title: "Estado CAPI / Eventos",
+      title: "Estado CAPI / Venta Atribuida",
       icon: <Terminal className="h-4 w-4" />,
       fields: [
-        { label: "Estado CAPI", value: data.capiStatus },
-        { label: "ID Evento Meta", value: data.metaEventId },
-        { label: "Estado Meta", value: data.metaStatus },
-        { label: "Error Meta", value: data.metaError },
-        { label: "Respuesta Meta", value: data.metaResponse },
-        { label: "Fecha Envío Meta", value: data.fechaEnvioMeta ? format(new Date(data.fechaEnvioMeta), 'dd/MM/yyyy HH:mm:ss') : null },
+        { label: "CAPI Status", value: data.capiStatus || (data.saleId ? 'ver venta' : null) },
+        { label: "Venta ID", value: data.saleId || null },
+        { label: "Monto Venta", value: data.saleAmount != null ? `$${new Intl.NumberFormat('es-CL').format(data.saleAmount)}` : null },
+        { label: "Atribución", value: data.saleAttributionStatus || null },
+        { label: "ID Evento Meta", value: data.metaEventId || null },
+        { label: "Error Meta", value: data.metaError || data.saleMetaError || null },
+        { label: "Fecha Envío Meta", value: (data.fechaEnvioMeta || data.saleFechaEnvioMeta)
+            ? format(new Date(data.fechaEnvioMeta || data.saleFechaEnvioMeta), 'dd/MM/yyyy HH:mm:ss')
+            : null },
       ]
     },
     {

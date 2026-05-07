@@ -1374,11 +1374,52 @@ async function startServer() {
         where.createdAt = { gte: today };
       }
 
-      const leads = await prisma.lead.findMany({ 
+      const leads = await prisma.lead.findMany({
         where,
-        orderBy: { createdAt: "desc" } 
+        orderBy: { createdAt: "desc" },
+        include: {
+          matches: {
+            include: {
+              sale: {
+                select: {
+                  id: true,
+                  amount: true,
+                  capiStatus: true,
+                  attributionStatus: true,
+                  metaStatus: true,
+                  metaError: true,
+                  metaResponse: true,
+                  fechaEnvioMeta: true,
+                  createdAt: true,
+                }
+              }
+            },
+            orderBy: { createdAt: "desc" },
+            take: 1
+          }
+        }
       });
-      res.json(leads);
+
+      // Aplanar: adjuntar datos de la venta atribuida directamente al lead
+      const enriched = leads.map(lead => {
+        const bestMatch = lead.matches?.[0];
+        const sale = bestMatch?.sale;
+        return {
+          ...lead,
+          matches: undefined,
+          // Datos de la venta atribuida (para el inspector)
+          saleId:             sale?.id || null,
+          saleAmount:         sale?.amount || null,
+          capiStatus:         sale?.capiStatus || null,
+          saleFechaEnvioMeta: sale?.fechaEnvioMeta || null,
+          saleMetaStatus:     sale?.metaStatus || null,
+          saleMetaError:      sale?.metaError || null,
+          saleMetaResponse:   sale?.metaResponse || null,
+          saleAttributionStatus: sale?.attributionStatus || null,
+        };
+      });
+
+      res.json(enriched);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
