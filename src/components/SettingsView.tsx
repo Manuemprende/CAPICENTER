@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Shield, Key, Facebook, CheckCircle2, AlertCircle, RefreshCw, Settings, Trash2, Send, Zap, Fingerprint, Database, Cpu, Plus } from 'lucide-react';
+import { Shield, Key, Orbit, CheckCircle2, AlertCircle, RefreshCw, Settings, Trash2, Send, Zap, Fingerprint, Database, Plus, Infinity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -94,7 +94,7 @@ export function SettingsView() {
       <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex-shrink-0 z-10 border-b border-cyan-900/40 bg-slate-950/50 backdrop-blur-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex gap-4 items-center">
           <div className="h-10 w-10 flex border-[1px] border-cyan-500/40 bg-cyan-950/30 items-center justify-center rounded-sm">
-             <Cpu className="text-cyan-400 h-5 w-5" />
+             <Orbit className="text-cyan-400 h-5 w-5 animate-[spin_20s_linear_infinite]" />
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-[0.2em] uppercase text-white drop-shadow-[0_0_8px_rgba(34,211,238,0.5)] flex items-center gap-2">
@@ -113,8 +113,8 @@ export function SettingsView() {
 
       {/* Tab Navigation */}
       <div className="flex gap-1 px-6 pt-6 z-10 font-mono text-[10px] tracking-[0.15em] uppercase">
-        <button onClick={() => setActiveTab('meta')} className={cn("px-6 py-3 border-t-2 transition-all flex items-center gap-2 rounded-t-lg bg-gradient-to-t", activeTab === 'meta' ? "border-blue-400 text-blue-300 from-blue-900/20 to-transparent" : "border-transparent text-slate-500 hover:text-slate-300")}>
-          <Facebook className="h-4 w-4" /> Nodos Meta
+        <button onClick={() => setActiveTab('meta')} className={cn("px-6 py-3 border-t-2 transition-all flex items-center gap-2 rounded-t-lg bg-gradient-to-t", activeTab === 'meta' ? "border-blue-500 text-blue-400 from-blue-900/20 to-transparent" : "border-transparent text-slate-500 hover:text-slate-300")}>
+          <Infinity className="h-4 w-4" /> Nodos Meta
         </button>
         <button onClick={() => setActiveTab('alerts')} className={cn("px-6 py-3 border-t-2 transition-all flex items-center gap-2 rounded-t-lg bg-gradient-to-t", activeTab === 'alerts' ? "border-sky-400 text-sky-300 from-sky-900/20 to-transparent" : "border-transparent text-slate-500 hover:text-slate-300")}>
           <Send className="h-4 w-4" /> Alertas Telegram
@@ -145,7 +145,7 @@ export function SettingsView() {
                       }}>
                      <div className="absolute inset-0 bg-blue-900/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                      <div className="h-full w-full bg-black/90 backdrop-blur-md rounded-xl border border-white/5 flex flex-col items-center justify-center p-6 text-center gap-4 relative z-10 overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-10"><Facebook className="h-24 w-24" /></div>
+                        <div className="absolute top-0 right-0 p-4 opacity-10"><Infinity className="h-24 w-24" /></div>
                         <div className="h-14 w-14 rounded-full border border-blue-500/30 flex items-center justify-center bg-blue-950/50 text-blue-400 group-hover:bg-blue-500 group-hover:text-black transition-colors shadow-[0_0_15px_rgba(59,130,246,0.3)]">
                            <Plus className="h-6 w-6" />
                         </div>
@@ -164,7 +164,7 @@ export function SettingsView() {
                            <div className="p-5 border-b border-white/5 flex justify-between items-start">
                               <div className="flex gap-3">
                                  <div className="h-8 w-8 rounded bg-blue-950/50 border border-blue-500/30 flex items-center justify-center">
-                                    <Facebook className="h-4 w-4 text-blue-400" />
+                                    <Infinity className="h-4 w-4 text-blue-400" />
                                  </div>
                                  <div>
                                     <h3 className="text-xs font-bold text-white uppercase tracking-widest">{c.adminName || 'NODO_DESCONOCIDO'}</h3>
@@ -172,7 +172,7 @@ export function SettingsView() {
                                  </div>
                               </div>
                               <div className="flex gap-1">
-                                 <button onClick={() => { setForm({ ...c, accessToken: '' }); setIsEditing(c.id); }} className="h-6 w-6 rounded bg-slate-800 flex items-center justify-center hover:bg-blue-900 transition-colors">
+                                 <button onClick={() => { setForm({ ...c }); setIsEditing(c.id); }} className="h-6 w-6 rounded bg-slate-800 flex items-center justify-center hover:bg-blue-900 transition-colors">
                                     <Settings className="h-3 w-3 text-slate-300" />
                                  </button>
                                  <button onClick={() => deleteConfig(c.id)} className="h-6 w-6 rounded bg-slate-800 flex items-center justify-center hover:bg-red-900 transition-colors">
@@ -239,7 +239,7 @@ export function SettingsView() {
                          {/* CAPI DETAILS */}
                          <div className="space-y-6">
                             <div>
-                               <label className="text-[9px] font-mono text-blue-400 uppercase tracking-widest mb-2 block flex items-center gap-2"><Facebook className="h-3 w-3"/> ID del Pixel (Meta)</label>
+                               <label className="text-[9px] font-mono text-blue-400 uppercase tracking-widest mb-2 block flex items-center gap-2"><Orbit className="h-3 w-3"/> ID del Pixel (Meta)</label>
                                <input value={form.pixelId} onChange={e => setForm({...form, pixelId: e.target.value})} className="w-full bg-black/40 border border-slate-800 rounded px-4 py-3 text-xs font-mono text-white focus:border-blue-500 focus:outline-none transition-colors shadow-inner" />
                             </div>
                             <div>
@@ -325,6 +325,25 @@ export function SettingsView() {
                    </div>
                    
                    <div className="p-8 space-y-8">
+                      <div className="relative group">
+                         <div className="absolute inset-0 bg-blue-500/5 border border-blue-500/20 rounded-lg transform -skew-x-2" />
+                         <div className="relative p-6 flex flex-col md:flex-row gap-6 md:items-center">
+                            <div className="flex-1">
+                               <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-[10px] bg-blue-500 text-black px-2 py-0.5 rounded-sm font-bold uppercase">POST</span>
+                                  <h3 className="text-sm font-mono text-blue-400 tracking-widest">Webhook Unificado n8n</h3>
+                               </div>
+                               <div className="bg-black/40 border border-slate-800 p-3 rounded font-mono text-[11px] text-slate-300 break-all select-all">
+                                  {window.location.origin}/api/webhooks/n8n
+                               </div>
+                            </div>
+                            <div className="w-full md:w-48 bg-black/60 p-4 rounded border border-slate-800 font-mono text-[9px] uppercase space-y-2">
+                               <div className="flex justify-between"><span className="text-slate-500">Auth</span><span className="text-blue-400">X-API-KEY</span></div>
+                               <div className="flex justify-between"><span className="text-slate-500">Ruta</span><span className="text-white">LEAD/SALE</span></div>
+                            </div>
+                         </div>
+                      </div>
+
                       {/* Port 1 */}
                       <div className="relative group">
                          <div className="absolute inset-0 bg-green-500/5 border border-green-500/20 rounded-lg transform -skew-x-2" />

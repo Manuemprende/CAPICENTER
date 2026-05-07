@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, ShoppingCart, Target, Send, AlertCircle, Settings, LogOut, FileUp, Facebook } from 'lucide-react';
+import { LayoutDashboard, Users, ShoppingCart, Target, Send, AlertCircle, Settings, LogOut, FileUp, Orbit } from 'lucide-react';
+import logo from '../assets/images/wentix_logo_icon.png';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'motion/react';
@@ -41,11 +42,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         >
           <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-blue-400 rounded-2xl blur opacity-20 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
           <div className="relative w-10 h-10 bg-black rounded-xl flex items-center justify-center overflow-hidden border border-white/10 group-hover:border-blue-400/50 transition-colors">
-            <img 
-              src="/src/assets/images/wentix_logo_1777619758544.png" 
-              alt="Logo" 
-              className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" 
-            />
+            <img src={logo} className="h-7 w-7 object-contain" alt="Wentix Logo" />
           </div>
         </div>
         {!isCollapsed && (
@@ -55,7 +52,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             className="flex flex-col overflow-hidden"
           >
             <h1 className="font-cyber font-black text-lg tracking-tighter leading-none text-white whitespace-nowrap italic uppercase">WENTIX <span className="text-blue-400 not-italic">AI</span></h1>
-            <span className="text-[8px] text-blue-400/40 uppercase tracking-[0.4em] font-black mt-1 opacity-80 whitespace-nowrap">Centro de Control</span>
+            <span className="text-[8px] text-blue-400/60 uppercase tracking-[0.4em] font-black mt-1 opacity-80 whitespace-nowrap">Orbital Intelligence</span>
           </motion.div>
         )}
       </div>

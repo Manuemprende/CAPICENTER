@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -69,6 +69,8 @@ model Lead {
   isConverted            String?
   matches                AttributionMatch[]
   business               Business           @relation(fields: [businessId], references: [id])
+
+  @@unique([businessId, metaEventId])
 }
 
 model Sale {
@@ -111,6 +113,9 @@ model Sale {
   matches                AttributionMatch[]
   capiEvents             CapiEvent[]
   business               Business           @relation(fields: [businessId], references: [id])
+
+  @@unique([businessId, externalId])
+  @@unique([businessId, metaEventId])
 }
 
 model AttributionMatch {

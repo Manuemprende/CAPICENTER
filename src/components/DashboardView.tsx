@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DollarSign, ShieldCheck, Target, Send, Activity, Zap, TrendingUp, AlertTriangle, RefreshCw, Cpu, Database, Calendar, Facebook } from 'lucide-react';
+import { DollarSign, ShieldCheck, Target, Send, Activity, Zap, TrendingUp, AlertTriangle, RefreshCw, Orbit, Database, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -137,17 +137,16 @@ export function DashboardView() {
          <div className="flex items-center gap-6">
             <div className="h-20 w-20 bg-slate-900 flex items-center justify-center border-l border-t border-blue-500/20 shadow-[0_0_40px_rgba(59,130,246,0.05)] relative group overflow-hidden">
                <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors" />
-               <Cpu className="h-10 w-10 text-blue-400 z-10" />
+               <Orbit className="h-10 w-10 text-blue-400 z-10 animate-[spin_10s_linear_infinite]" />
             </div>
             <div>
                <div className="flex items-center gap-3">
                   <h1 className="text-5xl font-black italic tracking-tight text-white font-cyber leading-none uppercase">CAPI <span className="text-blue-400">CENTER</span></h1>
-                  <Facebook className="h-8 w-8 text-[#1877F2] drop-shadow-[0_0_10px_#1877F244]" />
                </div>
                <div className="flex items-center gap-4 mt-3">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.4em] flex items-center gap-2">
+                  <span className="text-[10px] text-blue-400/60 font-bold uppercase tracking-[0.4em] flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shadow-[0_0_5px_#3b82f6]" />
-                    Centro de Control // Integridad: 100%
+                    ORBITAL INTELLIGENCE // INTEGRIDAD: 100%
                   </span>
                   <Badge variant="outline" className="border-blue-500/30 text-blue-400 text-[8px] font-black rounded-none h-4">CAPI_SECURE</Badge>
                </div>

@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "start": "tsx server.ts",
     "build": "vite build && prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"

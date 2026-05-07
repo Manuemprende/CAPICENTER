@@ -23,6 +23,31 @@ function normalizePhone(phone: string): string {
   return cleaned;
 }
 
+function parseAmount(value: any): number {
+  const raw = cleanString(value);
+  if (!raw) return 0;
+  const normalized = raw.replace(/[^\d,.-]/g, "");
+  const hasComma = normalized.includes(",");
+  const hasDot = normalized.includes(".");
+
+  if (hasComma && hasDot) {
+    return Number(normalized.replace(/\./g, "").replace(",", "."));
+  }
+
+  if (hasComma) {
+    return Number(normalized.replace(",", "."));
+  }
+
+  if (hasDot) {
+    const parts = normalized.split(".");
+    if (parts.length > 1 && parts[parts.length - 1].length === 3) {
+      return Number(parts.join(""));
+    }
+  }
+
+  return Number(normalized);
+}
+
 import crypto from "crypto";
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "fallback_key_32_chars_long_12345"; // Should be 32 chars
@@ -48,6 +73,7 @@ function decrypt(text: string) {
 
 // Helpers for flexible field mapping
 function findField(obj: any, synonyms: string[]): any {
+  if (!obj || typeof obj !== "object") return undefined;
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
   const normalizedSynonyms = synonyms.map(normalize);
 
@@ -56,6 +82,116 @@ function findField(obj: any, synonyms: string[]): any {
     if (normalizedSynonyms.includes(normKey)) return obj[key];
   }
   return undefined;
+}
+
+function cleanString(value: any): string {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function firstPresent(...values: any[]): string {
+  for (const value of values) {
+    const cleaned = cleanString(value);
+    if (cleaned) return cleaned;
+  }
+  return "";
+}
+
+function extractLabels(body: any): string[] {
+  const candidates = [
+    body?.labels,
+    body?.conversation?.labels,
+    body?.changed_attributes?.labels?.current_value,
+    body?.changed_attributes?.labels,
+    body?.label_list,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate.map((label) => cleanString(label).toLowerCase()).filter(Boolean);
+    if (typeof candidate === "string") return candidate.split(",").map((label) => cleanString(label).toLowerCase()).filter(Boolean);
+  }
+
+  return [];
+}
+
+function normalizeN8nPayload(body: any) {
+  const contact = body?.meta?.sender || body?.conversation?.contact || body?.contact || body?.sender || {};
+  const conversationAttrs = body?.custom_attributes || body?.conversation?.custom_attributes || {};
+  const contactAttrs = contact?.custom_attributes || body?.meta?.sender?.custom_attributes || {};
+  const attrs = { ...contactAttrs, ...conversationAttrs };
+  const labels = extractLabels(body);
+
+  const declaredType = cleanString(findField(body, ["eventType", "type", "tipo", "entity", "resource"])).toLowerCase();
+  const saleLabels = new Set(["pagado", "pagada", "paid", "compra", "comprado", "convertido", "venta"]);
+  const isSale = declaredType.includes("sale") || declaredType.includes("venta") || labels.some((label) => saleLabels.has(label));
+
+  const conversationId = firstPresent(
+    body?.id,
+    body?.conversation?.id,
+    body?.conversationId,
+    body?.conversation_id,
+    attrs?.conversationId,
+    attrs?.conversation_id,
+  );
+  const phone = firstPresent(
+    findField(body, ["phone", "telefono", "whatsapp", "celular", "contacto", "mobile", "numero", "waId"]),
+    contact?.phone_number,
+    contact?.phone,
+    attrs?.phone,
+    attrs?.telefono,
+    attrs?.whatsapp_number,
+  );
+  const customerName = firstPresent(
+    findField(body, ["name", "nombre", "customer", "cliente", "user_name"]),
+    contact?.name,
+    attrs?.name,
+    attrs?.nombre,
+    attrs?.customer_name,
+  );
+  const amount = firstPresent(
+    findField(body, ["amount", "value", "monto", "valor", "total", "precio", "monto_total", "venta"]),
+    attrs?.amount,
+    attrs?.monto,
+    attrs?.monto_venta,
+    attrs?.value,
+  );
+  const adId = firstPresent(findField(body, ["adId", "ad_id", "id_anuncio"]), attrs?.adId, attrs?.ad_id, body?.referral?.source_id);
+  const metaEventId = firstPresent(
+    findField(body, ["metaEventId", "meta_event_id", "event_id"]),
+    attrs?.metaEventId,
+    attrs?.meta_event_id,
+    conversationId || phone ? `${isSale ? "purchase" : "lead"}-${conversationId || "no-conv"}-${normalizePhone(phone || "no-phone")}` : "",
+  );
+
+  const payload: any = {
+    phone,
+    name: customerName,
+    stage: firstPresent(findField(body, ["stage", "etapa", "status", "estado"]), attrs?.stage, labels.join(",")),
+    conversationId,
+    country: firstPresent(findField(body, ["country", "pais", "nacion"]), attrs?.country, attrs?.pais, attrs?.country_code, "CL"),
+    whatsappId: firstPresent(findField(body, ["whatsappId", "waId", "wa_id", "inboxid"]), attrs?.whatsappId, attrs?.wa_id),
+    ctwaClid: firstPresent(findField(body, ["ctwaClid", "clid", "fbclid", "clickId", "ctwa_clid"]), attrs?.ctwaClid, attrs?.ctwa_clid, body?.referral?.ctwa_clid),
+    campaignId: firstPresent(findField(body, ["campaignId", "campId", "id_campana", "campaign_id"]), attrs?.campaignId, attrs?.campaign_id),
+    campaignName: firstPresent(findField(body, ["campaignName", "campName", "nombre_campana", "campaign_name"]), attrs?.campaignName, attrs?.campaign_name),
+    adsetId: firstPresent(findField(body, ["adsetId", "adset_id", "id_conjunto"]), attrs?.adsetId, attrs?.adset_id),
+    adsetName: firstPresent(findField(body, ["adsetName", "adset_name", "nombre_conjunto"]), attrs?.adsetName, attrs?.adset_name),
+    adId,
+    adName: firstPresent(findField(body, ["adName", "ad_name", "nombre_anuncio"]), attrs?.adName, attrs?.ad_name),
+    adHeadline: firstPresent(findField(body, ["adHeadline", "ad_headline", "headline"]), attrs?.adHeadline, attrs?.ad_headline, body?.referral?.headline),
+    adUrl: firstPresent(findField(body, ["adUrl", "ad_url"]), attrs?.adUrl, attrs?.ad_url, body?.referral?.source_url),
+    metaEventId,
+    converted: firstPresent(findField(body, ["converted", "convertido"]), isSale ? "true" : ""),
+    rawEvent: body,
+  };
+
+  if (isSale) {
+    payload.amount = amount;
+    payload.externalId = firstPresent(findField(body, ["externalId", "id", "transaccion", "pedido", "orderId", "id_venta", "trans_id"]), attrs?.externalId, attrs?.external_id, conversationId ? `chatwoot-${conversationId}` : "");
+    payload.currency = firstPresent(findField(body, ["currency", "moneda", "divisa"]), attrs?.currency, "CLP");
+    payload.paymentStatus = firstPresent(findField(body, ["paymentStatus", "pago_estado"]), attrs?.paymentStatus, "paid");
+  }
+
+  return { kind: isSale ? "sales" : "leads", payload, labels };
 }
 
 async function startServer() {
@@ -86,6 +222,110 @@ async function startServer() {
   };
 
   // --- API Routes ---
+
+  // GET /api/health
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", version: "1.0.0", timestamp: new Date().toISOString() });
+  });
+
+  // POST /api/setup — Bootstrap: create the first Business + ApiKey (only if none exist)
+  app.post("/api/setup", async (req, res) => {
+    try {
+      const existingBusiness = await prisma.business.findFirst();
+      if (existingBusiness) {
+        const existingKey = await prisma.apiKey.findFirst({ where: { businessId: existingBusiness.id } });
+        return res.json({
+          message: "Business already exists",
+          business: existingBusiness,
+          apiKey: existingKey?.key
+        });
+      }
+
+      const { businessName = "Wentix AI", apiKey: customKey, email = "admin@wentixai.pro" } = req.body;
+      const generatedKey = customKey || `capi-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+      // Ensure a user exists to associate with the business
+      let user = await prisma.user.findFirst({ where: { email } });
+      if (!user) {
+        user = await prisma.user.create({
+          data: { 
+            email,
+            name: "Admin Wentix"
+          }
+        });
+      }
+
+      const business = await prisma.business.create({
+        data: { 
+          name: businessName,
+          user: { connect: { id: user.id } }
+        }
+      });
+
+      const apiKey = await prisma.apiKey.create({
+        data: { key: generatedKey, businessId: business.id, active: true }
+      });
+
+      res.json({ success: true, business, apiKey: apiKey.key });
+    } catch (error: any) {
+      console.error("Setup Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/businesses — List all businesses and their API keys
+  app.get("/api/businesses", async (req, res) => {
+    try {
+      const businesses = await prisma.business.findMany({
+        include: { apiKeys: true }
+      });
+      res.json(businesses);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/businesses/:id/keys — Add a new API key to a business
+  app.post("/api/businesses/:id/keys", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { key: customKey } = req.body;
+      const key = customKey || `capi-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const apiKey = await prisma.apiKey.create({
+        data: { key, businessId: id, active: true }
+      });
+      res.json({ success: true, apiKey });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/webhooks/n8n
+  // Single ingress for Chatwoot/n8n. It infers leads vs sales and reuses the
+  // existing typed webhook handlers so dedupe, attribution and CAPI stay aligned.
+  app.post("/api/webhooks/n8n", validateApiKey, async (req, res) => {
+    try {
+      const normalized = normalizeN8nPayload(req.body);
+      const apiKey = String(req.headers["x-api-key"]);
+      const targetUrl = `http://127.0.0.1:${PORT}/api/webhooks/${normalized.kind}`;
+      const response = await axios.post(targetUrl, normalized.payload, {
+        headers: { "x-api-key": apiKey },
+        validateStatus: () => true,
+      });
+
+      res.status(response.status).json({
+        success: response.status >= 200 && response.status < 300,
+        routedTo: normalized.kind,
+        labels: normalized.labels,
+        result: response.data,
+      });
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        return res.status(200).json({ success: true, message: "Duplicate lead ignored" });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // POST /api/webhooks/leads
   app.post("/api/webhooks/leads", validateApiKey, async (req, res) => {
@@ -211,13 +451,22 @@ async function startServer() {
       const whatsappId = findField(body, ["whatsappId", "waId", "inboxid"]);
       const paymentStatus = findField(body, ["paymentStatus", "status", "estado", "pago_estado"]) || "paid";
       const ctwaClid = findField(body, ["ctwaClid", "clid", "fbclid", "clickId"]);
+      const campaignId = findField(body, ["campaignId", "campId", "id_campana", "campaign_id"]);
+      const campaignName = findField(body, ["campaignName", "campName", "nombre_campana", "campaign_name"]);
+      const adsetId = findField(body, ["adsetId", "adset_id", "id_conjunto"]);
+      const adsetName = findField(body, ["adsetName", "adset_name", "nombre_conjunto"]);
+      const adId = findField(body, ["adId", "ad_id", "id_anuncio"]);
+      const adName = findField(body, ["adName", "ad_name", "nombre_anuncio"]);
 
-      if (!phone || amount === undefined) return res.status(400).json({ error: "Phone and amount are required" });
+      const parsedAmount = parseAmount(amount);
+      if (!phone || amount === undefined || !Number.isFinite(parsedAmount)) {
+        return res.status(400).json({ error: "Phone and valid amount are required" });
+      }
 
       const phoneNormalized = normalizePhone(String(phone));
 
       // Separate known fields from metadata
-      const knownKeys = ["phone", "amount", "externalId", "currency", "whatsappId", "paymentStatus", "ctwaClid", "name", "nombre", "stage", "etapa", "country", "pais", "conversationId", "converted", "adUrl", "ad_url", "adHeadline", "ad_headline", "metaEventId", "meta_event_id", "metaStatus", "meta_status", "metaResponse", "meta_response", "metaError", "meta_error"];
+      const knownKeys = ["phone", "amount", "externalId", "currency", "whatsappId", "paymentStatus", "ctwaClid", "name", "nombre", "stage", "etapa", "country", "pais", "conversationId", "converted", "adUrl", "ad_url", "adHeadline", "ad_headline", "adId", "ad_id", "adName", "ad_name", "campaignId", "campaign_id", "campaignName", "campaign_name", "adsetId", "adset_id", "adsetName", "adset_name", "metaEventId", "meta_event_id", "metaStatus", "meta_status", "metaResponse", "meta_response", "metaError", "meta_error"];
       
       const adUrl = findField(body, ["adUrl", "ad_url"]);
       const adHeadline = findField(body, ["adHeadline", "ad_headline", "headline"]);
@@ -272,7 +521,7 @@ async function startServer() {
         data: {
           businessId,
           externalId: externalId ? String(externalId) : null,
-          amount: parseFloat(String(amount)),
+          amount: parsedAmount,
           currency: String(currency),
           phone: String(phone),
           phoneNormalized,
@@ -290,6 +539,12 @@ async function startServer() {
           whatsappId: whatsappId ? String(whatsappId) : null,
           ctwaClid: ctwaClid ? String(ctwaClid) : null,
           paymentStatus: String(paymentStatus),
+          campaignId: campaignId ? String(campaignId) : null,
+          campaignName: campaignName ? String(campaignName) : null,
+          adsetId: adsetId ? String(adsetId) : null,
+          adsetName: adsetName ? String(adsetName) : null,
+          adId: adId ? String(adId) : null,
+          adName: adName ? String(adName) : null,
           metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
         }
       });
@@ -304,6 +559,9 @@ async function startServer() {
 
       res.json({ success: true, sale: updatedSale });
     } catch (error: any) {
+      if (error?.code === "P2002") {
+        return res.status(200).json({ success: true, message: "Duplicate sale ignored" });
+      }
       console.error("Sales Webhook Error:", error);
       res.status(500).json({ error: error.message });
     }
@@ -708,11 +966,11 @@ async function startServer() {
   // POST /api/settings/meta
   app.post("/api/settings/meta", async (req, res) => {
     try {
-      const { id, pixelId, accessToken, businessManagerId, datasetId, testEventCode, active, adminName, phoneNumber } = req.body;
-      
+      const { id, pixelId, accessToken, businessManagerId, datasetId, testEventCode, active, adminName, phoneNumber, inboxId, chatwootUrl } = req.body;
+
       let finalToken = accessToken;
       let existing = null;
-      
+
       if (id) {
         existing = await prisma.metaConfig.findUnique({ where: { id } });
       }
@@ -723,7 +981,7 @@ async function startServer() {
         finalToken = existing.accessToken;
       }
 
-      const business = await prisma.business.findFirst(); 
+      const business = await prisma.business.findFirst();
       if (!business) return res.status(404).json({ error: "Business not found" });
 
       const data = {
@@ -734,6 +992,8 @@ async function startServer() {
         testEventCode,
         adminName,
         phoneNumber,
+        inboxId: inboxId || null,
+        chatwootUrl: chatwootUrl || null,
         active: active !== undefined ? active : true,
         businessId: business.id
       };
@@ -789,11 +1049,12 @@ async function startServer() {
       return;
     }
 
-    // Smart Config Selection: Try to match by sale phone, fallback to active one
-    let config = sale.business.metaConfigs.find(c => c.active && c.phoneNumber && normalizePhone(c.phoneNumber) === sale.phoneNormalized);
-    if (!config) {
-      config = sale.business.metaConfigs.find(c => c.active);
-    }
+    // 1. Match by inboxId (sale.whatsappId = Chatwoot inbox_id enviado desde n8n)
+    let config = sale.whatsappId
+      ? sale.business.metaConfigs.find(c => c.active && c.inboxId && c.inboxId === sale.whatsappId)
+      : undefined;
+    // 2. Fallback: any active config
+    if (!config) config = sale.business.metaConfigs.find(c => c.active);
     
     if (!config) return;
 
