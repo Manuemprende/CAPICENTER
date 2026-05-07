@@ -166,8 +166,8 @@ export function CapiEventsView() {
               </React.Fragment>
             ))}
           </TableBody>
-        </div>
         </Table>
+        </div>
       </Card>
     </div>
   );
