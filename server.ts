@@ -732,12 +732,15 @@ async function startServer() {
       const lead = await prisma.lead.findUnique({ where: { id: bestLeadId } });
       const isScalable = (sale.paymentStatus === "paid" && sale.amount > 0 && (status === "strong_match" || status === "attributed") && (lead?.adId || lead?.campaignId)) ? true : false;
 
+      // Copiar nombre del lead a la venta si la venta no tiene nombre
+      const nameUpdate: any = { attributionStatus: status, isScalable: isScalable };
+      if (!sale.customerName && lead?.customerName) {
+        nameUpdate.customerName = lead.customerName;
+      }
+
       await prisma.sale.update({
         where: { id: sale.id },
-        data: {
-          attributionStatus: status,
-          isScalable: isScalable
-        }
+        data: nameUpdate
       });
 
       // --- AUTOMATIC CAPI TRANSMISSION ---
