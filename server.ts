@@ -1275,6 +1275,52 @@ async function startServer() {
     }
   }
 
+  // GET /api/attribution — Matches de atribución con datos completos
+  app.get("/api/attribution", async (req, res) => {
+    try {
+      const { from, to, limit: lim } = req.query;
+      const take = Math.min(parseInt(String(lim || "100")), 500);
+      const where: any = {};
+      if (from) where.createdAt = { gte: new Date(from as string) };
+      if (to) where.createdAt = { ...where.createdAt, lte: new Date(new Date(to as string).setHours(23,59,59,999)) };
+
+      const matches = await prisma.attributionMatch.findMany({
+        where,
+        take,
+        orderBy: { createdAt: "desc" },
+        include: {
+          sale: { select: { id:true, customerName:true, phone:true, amount:true, currency:true, capiStatus:true, attributionStatus:true, isScalable:true, createdAt:true, adName:true, campaignName:true } },
+          lead: { select: { id:true, customerName:true, phone:true, ctwaClid:true, adId:true, adName:true, campaignName:true, adsetName:true, createdAt:true } }
+        }
+      });
+      res.json(matches);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // GET /api/capi/events — Log de todos los eventos CAPI enviados
+  app.get("/api/capi/events", async (req, res) => {
+    try {
+      const { from, to, status, limit: lim } = req.query;
+      const take = Math.min(parseInt(String(lim || "100")), 500);
+      const where: any = {};
+      if (status) where.status = String(status);
+      if (from || to) {
+        where.createdAt = {};
+        if (from) where.createdAt.gte = new Date(from as string);
+        if (to) { const d = new Date(to as string); d.setHours(23,59,59,999); where.createdAt.lte = d; }
+      }
+
+      const events = await prisma.capiEvent.findMany({
+        where, take,
+        orderBy: { createdAt: "desc" },
+        include: {
+          sale: { select: { customerName:true, phone:true, amount:true, currency:true, campaignName:true, adName:true } }
+        }
+      });
+      res.json(events);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // GET /api/leads
   app.get("/api/leads", async (req, res) => {
     try {

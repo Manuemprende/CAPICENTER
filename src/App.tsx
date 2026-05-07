@@ -4,6 +4,8 @@ import { DashboardView } from './components/DashboardView';
 import { LeadsView, SalesView } from './components/Views';
 import { SettingsView } from './components/SettingsView';
 import { ImportView } from './components/ImportView';
+import { AttributionView } from './components/AttributionView';
+import { CapiEventsView } from './components/CapiEventsView';
 
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -18,6 +20,10 @@ export default function App() {
         return <SalesView />;
       case 'import':
         return <ImportView />;
+      case 'attribution':
+        return <AttributionView />;
+      case 'capi':
+        return <CapiEventsView />;
       case 'settings':
         return <SettingsView />;
       default:
