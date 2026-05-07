@@ -253,6 +253,21 @@ async function startServer() {
     res.json({ status: "ok", version: "1.0.0", timestamp: new Date().toISOString() });
   });
 
+  // POST /api/admin/enrich-leads — enriquece todos los leads con adId sin campaignName
+  app.post("/api/admin/enrich-leads", async (req, res) => {
+    try {
+      const leads = await prisma.lead.findMany({
+        where: { adId: { not: null }, campaignName: null }
+      });
+      res.json({ message: `Enriching ${leads.size ?? leads.length} leads in background` });
+      for (const lead of leads) {
+        if (lead.adId) await enrichLeadAdData(lead.id, lead.adId).catch(() => {});
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // POST /api/setup — Bootstrap: create the first Business + ApiKey (only if none exist)
   app.post("/api/setup", async (req, res) => {
     try {
