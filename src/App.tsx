@@ -73,10 +73,12 @@ export default function App() {
         <div className="fixed inset-0 bg-black/70 z-40 md:hidden" onClick={() => setMobileOpen(false)} />
       )}
 
-      {/* Sidebar: hidden en mobile cuando cerrado, fixed overlay cuando abierto, normal en desktop */}
-      <div className={`shrink-0 ${mobileOpen ? 'fixed inset-y-0 left-0 z-50' : 'hidden md:flex'}`}>
-        <Sidebar currentView={currentView} onViewChange={handleViewChange} onLogout={handleLogout} />
-      </div>
+      {/* Sidebar: solo se renderiza si es desktop O si está abierto en mobile */}
+      {(mobileOpen || window.innerWidth >= 768) && (
+        <div className={`shrink-0 ${mobileOpen ? 'fixed inset-y-0 left-0 z-50' : 'relative'}`}>
+          <Sidebar currentView={currentView} onViewChange={handleViewChange} onLogout={handleLogout} />
+        </div>
+      )}
 
       {/* Main content — ocupa todo el ancho en mobile */}
       <main className="flex-1 overflow-y-auto min-w-0 w-full">

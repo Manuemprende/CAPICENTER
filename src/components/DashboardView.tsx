@@ -142,45 +142,44 @@ export function DashboardView() {
                <Orbit className="h-6 w-6 md:h-10 md:w-10 text-blue-400 z-10 animate-[spin_10s_linear_infinite]" />
             </div>
             <div>
-               <h1 className="text-3xl md:text-5xl font-black italic tracking-tight text-white font-cyber leading-none uppercase">CAPI <span className="text-blue-400">CENTER</span></h1>
-               <div className="flex items-center gap-2 mt-1 md:mt-3 flex-wrap">
-                  <span className="text-[9px] text-blue-400/60 font-bold uppercase tracking-widest flex items-center gap-1">
+               <h1 className="text-2xl sm:text-3xl md:text-5xl font-black italic tracking-tight text-white font-cyber leading-none uppercase">CAPI <span className="text-blue-400">CENTER</span></h1>
+               <div className="flex items-center gap-2 mt-1 md:mt-3">
+                  <span className="text-[8px] text-blue-400/60 font-bold uppercase tracking-widest flex items-center gap-1">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                    ORBITAL INTELLIGENCE
+                    <span className="hidden sm:inline">ORBITAL INTELLIGENCE //</span> ACTIVO
                   </span>
-                  <Badge variant="outline" className="border-blue-500/30 text-blue-400 text-[8px] font-black rounded-none h-4 hidden sm:flex">CAPI_SECURE</Badge>
                </div>
             </div>
          </div>
 
-         <div className="flex items-stretch bg-slate-900 border border-slate-800 h-10 md:h-14 overflow-hidden w-full xl:w-auto">
-            <div className="flex items-center px-3 md:px-6 gap-2 md:gap-6 relative overflow-hidden group">
+         <div className="flex items-stretch bg-slate-900 border border-slate-800 h-10 md:h-14 overflow-hidden w-full xl:w-auto min-w-0">
+            <div className="flex items-center px-2 md:px-6 gap-1 md:gap-6 relative overflow-hidden group min-w-0">
                <div className="absolute inset-y-0 left-0 w-[2px] bg-blue-500 shadow-[0_0_10px_#3b82f6]" />
                
-               <div className="flex flex-col">
-                  <span className="text-[8px] font-black text-slate-600 uppercase tracking-[0.3em] block leading-none mb-2">Nodo Temporal // Inicio</span>
-                  <div className="flex items-center gap-2">
-                     <Calendar className="h-3 w-3 text-blue-500/40" />
-                     <input 
-                        type="date" 
-                        value={dateRange.from} 
+               <div className="flex flex-col min-w-0">
+                  <span className="text-[7px] font-black text-slate-600 uppercase tracking-wider block leading-none mb-1 hidden md:block">Inicio</span>
+                  <div className="flex items-center gap-1">
+                     <Calendar className="h-3 w-3 text-blue-500/40 shrink-0" />
+                     <input
+                        type="date"
+                        value={dateRange.from}
                         onChange={e => setDateRange({...dateRange, from: e.target.value})}
-                        className="bg-transparent text-xs font-mono font-bold text-blue-400 border-none p-0 focus:ring-0 cursor-pointer [color-scheme:dark]" 
+                        className="bg-transparent text-[11px] md:text-xs font-mono font-bold text-blue-400 border-none p-0 focus:ring-0 cursor-pointer [color-scheme:dark] min-w-0 w-full"
                      />
                   </div>
                </div>
 
-               <div className="h-6 w-[1px] bg-slate-800 self-center" />
+               <div className="h-4 w-[1px] bg-slate-800 self-center mx-1" />
 
-               <div className="flex flex-col">
-                  <span className="text-[8px] font-black text-slate-600 uppercase tracking-[0.3em] block leading-none mb-2">Nodo Temporal // Fin</span>
-                  <div className="flex items-center gap-2">
-                     <Calendar className="h-3 w-3 text-blue-500/40" />
-                     <input 
-                        type="date" 
-                        value={dateRange.to} 
+               <div className="flex flex-col min-w-0">
+                  <span className="text-[7px] font-black text-slate-600 uppercase tracking-wider block leading-none mb-1 hidden md:block">Fin</span>
+                  <div className="flex items-center gap-1">
+                     <Calendar className="h-3 w-3 text-blue-500/40 shrink-0" />
+                     <input
+                        type="date"
+                        value={dateRange.to}
                         onChange={e => setDateRange({...dateRange, to: e.target.value})}
-                        className="bg-transparent text-xs font-mono font-bold text-blue-400 border-none p-0 focus:ring-0 cursor-pointer [color-scheme:dark]" 
+                        className="bg-transparent text-[11px] md:text-xs font-mono font-bold text-blue-400 border-none p-0 focus:ring-0 cursor-pointer [color-scheme:dark] min-w-0 w-full"
                      />
                   </div>
                </div>
@@ -206,28 +205,28 @@ export function DashboardView() {
                animate={{ opacity: 1, y: 0 }}
                transition={{ delay: i * 0.05 }}
                className={cn(
-                  "cyber-card p-5 group flex flex-col justify-between h-36",
+                  "cyber-card p-3 md:p-5 group flex flex-col justify-between h-28 md:h-36 overflow-hidden",
                   hud.color === 'red' && 'border-red-500/40 bg-red-500/[0.03]'
                )}
             >
                <div className="flex justify-between items-start">
-                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest leading-none group-hover:text-zinc-400 transition-colors">{hud.label}</span>
-                  <div className={cn("p-1.5 border border-zinc-900 group-hover:border-blue-500/20 group-hover:text-blue-400 text-zinc-700 transition-all",
+                  <span className="text-[8px] md:text-[9px] font-black text-zinc-500 uppercase tracking-wider leading-tight group-hover:text-zinc-400 transition-colors line-clamp-2">{hud.label}</span>
+                  <div className={cn("p-1 md:p-1.5 border border-zinc-900 shrink-0",
                     hud.color === 'red' && 'text-red-500 border-red-500/20',
                     hud.color === 'blue' && 'text-blue-500 border-blue-500/20'
                   )}>
-                     {React.cloneElement(hud.icon as React.ReactElement<any>, { className: "h-3 w-3" })}
+                     {React.cloneElement(hud.icon as React.ReactElement<any>, { className: "h-2.5 w-2.5 md:h-3 md:w-3" })}
                   </div>
                </div>
-               <div>
+               <div className="min-w-0">
                   <div className={cn(
-                    "text-2xl font-black font-cyber text-white tracking-widest tabular-nums",
+                    "text-xl md:text-2xl font-black font-cyber text-white tabular-nums truncate",
                     hud.color === 'blue' && 'neon-text-blue',
                     hud.color === 'red' && 'neon-text-red text-red-500'
                   )}>
                     {hud.isMoney ? `$${new Intl.NumberFormat('es-CL').format(Number(hud.value))}` : hud.value}
                   </div>
-                  <p className="text-[9px] font-bold text-zinc-600 mt-2 uppercase tracking-tighter truncate">{hud.sub}</p>
+                  <p className="text-[8px] font-bold text-zinc-600 mt-1 uppercase tracking-tighter truncate">{hud.sub}</p>
                </div>
             </motion.div>
          ))}
