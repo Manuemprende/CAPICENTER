@@ -6,6 +6,7 @@ import { SettingsView } from './components/SettingsView';
 import { ImportView } from './components/ImportView';
 import { AttributionView } from './components/AttributionView';
 import { CapiEventsView } from './components/CapiEventsView';
+import { ErrorsView } from './components/ErrorsView';
 import { LoginView } from './components/LoginView';
 import { Menu } from 'lucide-react';
 
@@ -54,6 +55,7 @@ export default function App() {
       case 'import':      return <ImportView />;
       case 'attribution': return <AttributionView />;
       case 'capi':        return <CapiEventsView />;
+      case 'errors':      return <ErrorsView />;
       case 'settings':    return <SettingsView />;
       default:
         return (

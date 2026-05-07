@@ -81,13 +81,49 @@ export function AttributionView() {
       </div>
 
       {/* Tabla */}
-      <Card className="border-slate-900 bg-slate-950 overflow-hidden rounded-none">
+      {/* MOBILE: Tarjetas */}
+      <div className="md:hidden space-y-2">
+        {matches.map((m, i) => (
+          <div key={i} className="bg-slate-950 border border-slate-900 p-4 space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="font-black text-white uppercase text-sm">{m.sale?.customerName || '—'}</div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">{m.sale?.phone} · ${new Intl.NumberFormat('es-CL').format(m.sale?.amount || 0)}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={cn("text-2xl font-black tabular-nums", SCORE_COLOR(m.matchScore))}>{m.matchScore}</span>
+                <div className={cn("h-2 w-2 rounded-full",
+                  m.sale?.capiStatus === 'sent' ? 'bg-blue-500 shadow-[0_0_5px_#3b82f6]' :
+                  m.sale?.capiStatus === 'failed' ? 'bg-red-500' : 'bg-slate-700'
+                )} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-black/30 p-2">
+                <div className="text-[8px] text-slate-600 uppercase font-black mb-0.5">Lead</div>
+                <div className="text-[10px] text-slate-300 font-bold">{m.lead?.customerName || '—'}</div>
+                <div className="text-[8px] text-slate-600 font-mono truncate">{m.lead?.phone}</div>
+              </div>
+              <div className="bg-black/30 p-2">
+                <div className="text-[8px] text-slate-600 uppercase font-black mb-0.5">Método</div>
+                <Badge className="text-[7px] font-black bg-slate-900 text-slate-400 border border-slate-800 rounded-none uppercase">
+                  {m.matchType?.toUpperCase() || '—'}
+                </Badge>
+              </div>
+            </div>
+            <div className="text-[9px] text-slate-500 truncate">{m.lead?.campaignName || m.sale?.campaignName || 'Sin campaña'}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* DESKTOP: Tabla */}
+      <Card className="hidden md:block border-slate-900 bg-slate-950 overflow-hidden rounded-none">
         <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-slate-900 hover:bg-transparent bg-slate-950">
               <TableHead className="text-[9px] font-black uppercase text-slate-500 py-4 pl-6 tracking-widest">Venta</TableHead>
-              <TableHead className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Lead Matcheado</TableHead>
+              <TableHead className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Lead</TableHead>
               <TableHead className="text-[9px] font-black uppercase text-slate-500 tracking-widest text-center">Score</TableHead>
               <TableHead className="text-[9px] font-black uppercase text-slate-500 tracking-widest text-center">Método</TableHead>
               <TableHead className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Campaña</TableHead>
@@ -99,42 +135,25 @@ export function AttributionView() {
               <TableRow key={i} className="border-slate-900/50 hover:bg-blue-500/[0.015] transition-all">
                 <TableCell className="pl-6 py-4">
                   <div className="font-black text-slate-200 text-xs uppercase">{m.sale?.customerName || '—'}</div>
-                  <div className="text-[9px] text-slate-600 font-mono mt-0.5">
-                    ${new Intl.NumberFormat('es-CL').format(m.sale?.amount || 0)} · {m.sale?.phone}
-                  </div>
+                  <div className="text-[9px] text-slate-600 font-mono mt-0.5">${new Intl.NumberFormat('es-CL').format(m.sale?.amount || 0)}</div>
                 </TableCell>
                 <TableCell>
                   <div className="font-bold text-slate-300 text-xs">{m.lead?.customerName || '—'}</div>
                   <div className="text-[9px] text-slate-600 font-mono mt-0.5">{m.lead?.phone}</div>
                 </TableCell>
                 <TableCell className="text-center">
-                  <span className={cn("text-xl font-black tabular-nums", SCORE_COLOR(m.matchScore))}>
-                    {m.matchScore}
-                  </span>
+                  <span className={cn("text-xl font-black tabular-nums", SCORE_COLOR(m.matchScore))}>{m.matchScore}</span>
                 </TableCell>
                 <TableCell className="text-center">
-                  <Badge className="text-[8px] font-black bg-slate-900 text-slate-400 border border-slate-800 rounded-none uppercase tracking-widest">
-                    {m.matchType?.toUpperCase() || '—'}
-                  </Badge>
+                  <Badge className="text-[8px] font-black bg-slate-900 text-slate-400 border border-slate-800 rounded-none uppercase">{m.matchType?.toUpperCase() || '—'}</Badge>
                 </TableCell>
                 <TableCell>
-                  <div className="text-[10px] text-slate-400 font-bold truncate max-w-[140px]">
-                    {m.lead?.campaignName || m.sale?.campaignName || 'Sin campaña'}
-                  </div>
-                  <div className="text-[8px] text-slate-600 mt-0.5 truncate max-w-[140px]">
-                    {m.lead?.adName || m.sale?.adName || ''}
-                  </div>
+                  <div className="text-[10px] text-slate-400 font-bold truncate max-w-[140px]">{m.lead?.campaignName || 'Sin campaña'}</div>
                 </TableCell>
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center gap-1.5">
-                    <div className={cn("h-1.5 w-1.5 rounded-full",
-                      m.sale?.capiStatus === 'sent' ? 'bg-blue-500 shadow-[0_0_5px_#3b82f6]' :
-                      m.sale?.capiStatus === 'failed' ? 'bg-red-500' : 'bg-slate-700'
-                    )} />
-                    <span className={cn("text-[8px] font-black uppercase",
-                      m.sale?.capiStatus === 'sent' ? 'text-blue-400' :
-                      m.sale?.capiStatus === 'failed' ? 'text-red-500' : 'text-slate-600'
-                    )}>
+                    <div className={cn("h-1.5 w-1.5 rounded-full", m.sale?.capiStatus === 'sent' ? 'bg-blue-500' : m.sale?.capiStatus === 'failed' ? 'bg-red-500' : 'bg-slate-700')} />
+                    <span className={cn("text-[8px] font-black uppercase", m.sale?.capiStatus === 'sent' ? 'text-blue-400' : m.sale?.capiStatus === 'failed' ? 'text-red-500' : 'text-slate-600')}>
                       {m.sale?.capiStatus === 'sent' ? 'OK' : m.sale?.capiStatus === 'failed' ? 'ERR' : 'PEND'}
                     </span>
                   </div>
