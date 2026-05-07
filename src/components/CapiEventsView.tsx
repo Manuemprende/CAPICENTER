@@ -78,8 +78,39 @@ export function CapiEventsView() {
         ))}
       </div>
 
-      {/* Tabla de eventos */}
-      <Card className="border-slate-900 bg-slate-950 overflow-hidden rounded-none">
+      {/* MOBILE: Tarjetas */}
+      <div className="md:hidden space-y-2">
+        {events.map((ev) => (
+          <div key={ev.id} className={cn("border p-4 rounded-none",
+            ev.status === 'sent' ? 'bg-slate-950 border-slate-900' :
+            ev.status === 'failed' ? 'bg-red-500/5 border-red-500/20' : 'bg-slate-950 border-slate-900'
+          )}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-black text-white uppercase text-sm">{ev.sale?.customerName || '—'}</span>
+                  <Badge className={cn("text-[8px] font-black rounded-none border uppercase tracking-widest shrink-0",
+                    ev.status === 'sent' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                    ev.status === 'failed' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-slate-800 text-slate-500 border-slate-700'
+                  )}>
+                    {ev.status === 'sent' ? '✓ ENVIADO' : ev.status === 'failed' ? '✗ FALLIDO' : '⏳ PEND'}
+                  </Badge>
+                </div>
+                <div className="font-mono text-lg font-black text-white mt-1">
+                  ${new Intl.NumberFormat('es-CL').format(ev.sale?.amount || 0)}
+                </div>
+                <div className="font-mono text-[9px] text-slate-500 mt-1 truncate">{ev.eventId}</div>
+                {ev.sentAt && <div className="text-[9px] text-slate-600 mt-1">{format(new Date(ev.sentAt), 'dd/MM/yyyy HH:mm:ss')}</div>}
+                {ev.error && <div className="text-[9px] text-red-400 mt-2 bg-red-500/5 p-2 border border-red-500/10">{ev.error}</div>}
+                {ev.sale?.campaignName && <div className="text-[9px] text-slate-600 mt-1 truncate">{ev.sale.campaignName}</div>}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* DESKTOP: Tabla */}
+      <Card className="hidden md:block border-slate-900 bg-slate-950 overflow-hidden rounded-none">
         <div className="overflow-x-auto">
         <Table>
           <TableHeader>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, ShoppingCart, Target, Send, AlertCircle, Settings, LogOut, FileUp, Orbit } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Banknote, Upload, GitMerge, Zap, AlertTriangle, SlidersHorizontal, LogOut, Orbit } from 'lucide-react';
 import logo from '../assets/images/wentix_logo_icon.png';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -12,14 +12,14 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { id: 'dashboard', label: 'Panel de Control', icon: LayoutDashboard },
-  { id: 'leads', label: 'Leads WhatsApp', icon: Users },
-  { id: 'sales', label: 'Ventas', icon: ShoppingCart },
-  { id: 'import', label: 'Importar Excel', icon: FileUp },
-  { id: 'attribution', label: 'Atribución', icon: Target },
-  { id: 'capi', label: 'Eventos CAPI', icon: Send },
-  { id: 'errors', label: 'Errores', icon: AlertCircle },
-  { id: 'settings', label: 'Configuración', icon: Settings },
+  { id: 'dashboard',   label: 'Dashboard',       icon: LayoutDashboard },
+  { id: 'leads',       label: 'Leads WhatsApp',  icon: MessageSquare },
+  { id: 'sales',       label: 'Ventas',           icon: Banknote },
+  { id: 'attribution', label: 'Atribución',       icon: GitMerge },
+  { id: 'capi',        label: 'Eventos CAPI',     icon: Zap },
+  { id: 'errors',      label: 'Errores',          icon: AlertTriangle },
+  { id: 'import',      label: 'Importar Excel',   icon: Upload },
+  { id: 'settings',    label: 'Configuración',    icon: SlidersHorizontal },
 ];
 
 export function Sidebar({ currentView, onViewChange, onLogout }: SidebarProps) {
