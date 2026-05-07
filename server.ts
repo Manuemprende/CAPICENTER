@@ -194,29 +194,41 @@ function normalizeN8nPayload(body: any) {
   return { kind: isSale ? "sales" : "leads", payload, labels };
 }
 
+// Tokens de campañas extra (ads_read) desde env var como JSON array
+const ADS_TOKENS: string[] = (() => {
+  try { return JSON.parse(process.env.FACEBOOK_ADS_TOKENS || "[]"); } catch { return []; }
+})();
+
 async function enrichLeadAdData(leadId: string, adId: string) {
-  try {
-    const config = await prisma.metaConfig.findFirst({ where: { active: true } });
-    if (!config) return;
-    const token = decrypt(config.accessToken);
-    const { data } = await axios.get(
-      `https://graph.facebook.com/v17.0/${adId}?fields=name,campaign{name,id},adset{name,id}&access_token=${token}`,
-      { timeout: 8000 }
-    );
-    await prisma.lead.update({
-      where: { id: leadId },
-      data: {
-        adName:       data.name             || null,
-        campaignId:   data.campaign?.id     || null,
-        campaignName: data.campaign?.name   || null,
-        adsetId:      data.adset?.id        || null,
-        adsetName:    data.adset?.name      || null,
-      }
-    });
-    console.log(`[AD ENRICH] Lead ${leadId} enriquecido: ${data.campaign?.name} / ${data.name}`);
-  } catch (err: any) {
-    console.warn(`[AD ENRICH] Falló para lead ${leadId}:`, err.message);
+  // Recolectar todos los tokens disponibles: MetaConfigs + ADS_TOKENS
+  const configs = await prisma.metaConfig.findMany({ where: { active: true } });
+  const tokens = [
+    ...configs.map(c => { try { return decrypt(c.accessToken); } catch { return ""; } }).filter(Boolean),
+    ...ADS_TOKENS,
+  ];
+
+  for (const token of tokens) {
+    try {
+      const { data } = await axios.get(
+        `https://graph.facebook.com/v17.0/${adId}?fields=name,campaign{name,id},adset{name,id}&access_token=${token}`,
+        { timeout: 8000 }
+      );
+      if (!data?.campaign?.name) continue;
+      await prisma.lead.update({
+        where: { id: leadId },
+        data: {
+          adName:       data.name           || null,
+          campaignId:   data.campaign?.id   || null,
+          campaignName: data.campaign?.name || null,
+          adsetId:      data.adset?.id      || null,
+          adsetName:    data.adset?.name    || null,
+        }
+      });
+      console.log(`[AD ENRICH] OK ${leadId}: ${data.campaign?.name} / ${data.name}`);
+      return;
+    } catch { continue; }
   }
+  console.warn(`[AD ENRICH] Ningún token pudo enriquecer lead ${leadId} adId ${adId}`);
 }
 
 async function startServer() {
