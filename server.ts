@@ -1212,7 +1212,7 @@ async function startServer() {
         data: [{
           event_name: "Purchase",
           event_time: Math.floor(sale.createdAt.getTime() / 1000),
-          action_source: "system",
+          action_source: "chat",
           event_id: eventId,
           user_data: {
             ph: [crypto.createHash('sha256').update(sale.phoneNormalized).digest('hex')],
