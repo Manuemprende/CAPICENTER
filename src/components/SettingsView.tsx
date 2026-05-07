@@ -137,7 +137,7 @@ export function SettingsView() {
           {activeTab === 'meta' && (
             <motion.div key="meta" initial="initial" animate="animate" exit="exit" variants={glowVars} className="h-full">
               {!isEditing ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
                   {/* Add New Card */}
                   <motion.div whileHover={{ scale: 1.02 }} className="group relative rounded-xl p-[1px] bg-gradient-to-b from-blue-900/50 to-transparent cursor-pointer h-[240px]" onClick={() => {
                         setForm({ pixelId: '', accessToken: '', businessManagerId: '', datasetId: '', testEventCode: '', adminName: '', phoneNumber: '', inboxId: '', chatwootUrl: '', active: true });

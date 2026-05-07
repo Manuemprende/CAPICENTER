@@ -132,31 +132,29 @@ export function DashboardView() {
 
   return (
     <div className="h-full flex flex-col bg-slate-950 cyber-grid relative selection:bg-blue-500/40 overflow-hidden">
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
-        <div className="flex flex-col gap-6">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8">
+        <div className="flex flex-col gap-4 md:gap-6">
           {/* HUD Header */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 z-10">
-         <div className="flex items-center gap-6">
-            <div className="h-20 w-20 bg-slate-900 flex items-center justify-center border-l border-t border-blue-500/20 shadow-[0_0_40px_rgba(59,130,246,0.05)] relative group overflow-hidden">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4 z-10">
+         <div className="flex items-center gap-3 md:gap-6">
+            <div className="h-12 w-12 md:h-20 md:w-20 bg-slate-900 flex items-center justify-center border-l border-t border-blue-500/20 relative group overflow-hidden shrink-0">
                <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors" />
-               <Orbit className="h-10 w-10 text-blue-400 z-10 animate-[spin_10s_linear_infinite]" />
+               <Orbit className="h-6 w-6 md:h-10 md:w-10 text-blue-400 z-10 animate-[spin_10s_linear_infinite]" />
             </div>
             <div>
-               <div className="flex items-center gap-3">
-                  <h1 className="text-5xl font-black italic tracking-tight text-white font-cyber leading-none uppercase">CAPI <span className="text-blue-400">CENTER</span></h1>
-               </div>
-               <div className="flex items-center gap-4 mt-3">
-                  <span className="text-[10px] text-blue-400/60 font-bold uppercase tracking-[0.4em] flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shadow-[0_0_5px_#3b82f6]" />
-                    ORBITAL INTELLIGENCE // INTEGRIDAD: 100%
+               <h1 className="text-3xl md:text-5xl font-black italic tracking-tight text-white font-cyber leading-none uppercase">CAPI <span className="text-blue-400">CENTER</span></h1>
+               <div className="flex items-center gap-2 mt-1 md:mt-3 flex-wrap">
+                  <span className="text-[9px] text-blue-400/60 font-bold uppercase tracking-widest flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                    ORBITAL INTELLIGENCE
                   </span>
-                  <Badge variant="outline" className="border-blue-500/30 text-blue-400 text-[8px] font-black rounded-none h-4">CAPI_SECURE</Badge>
+                  <Badge variant="outline" className="border-blue-500/30 text-blue-400 text-[8px] font-black rounded-none h-4 hidden sm:flex">CAPI_SECURE</Badge>
                </div>
             </div>
          </div>
 
-         <div className="flex items-stretch bg-slate-900 border border-slate-800 h-14 overflow-hidden shadow-2xl">
-            <div className="flex items-center px-6 gap-6 relative overflow-hidden group">
+         <div className="flex items-stretch bg-slate-900 border border-slate-800 h-10 md:h-14 overflow-hidden w-full xl:w-auto">
+            <div className="flex items-center px-3 md:px-6 gap-2 md:gap-6 relative overflow-hidden group">
                <div className="absolute inset-y-0 left-0 w-[2px] bg-blue-500 shadow-[0_0_10px_#3b82f6]" />
                
                <div className="flex flex-col">
@@ -200,7 +198,7 @@ export function DashboardView() {
       </div>
 
       {/* 10 KPIs Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 z-10">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4 z-10">
          {huds.map((hud, i) => (
             <motion.div 
                key={i}
@@ -236,7 +234,7 @@ export function DashboardView() {
       </div>
 
       {/* Main Analysis Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 z-10 flex-1 min-h-0 pb-8">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-6 z-10 flex-1 min-h-0 pb-8">
          
          {/* Ad Analytics Node */}
          <div className="xl:col-span-8 flex flex-col gap-4">
@@ -258,7 +256,7 @@ export function DashboardView() {
             </div>
 
             <Card className="cyber-card bg-slate-900/20 border-slate-800 flex-1 overflow-hidden">
-               <div className="overflow-y-auto h-full custom-scrollbar">
+               <div className="overflow-auto h-full custom-scrollbar">
                   <Table>
                     <TableHeader className="bg-slate-950 sticky top-0 z-30">
                       <TableRow className="border-slate-800 border-b hover:bg-transparent">

@@ -40,7 +40,7 @@ export function AttributionView() {
   const weak = matches.filter(m => m.matchScore < 70).length;
 
   return (
-    <div className="p-8 space-y-6 text-white animate-in fade-in duration-500">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-6 text-white animate-in fade-in duration-500">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sticky top-0 bg-[#020617] py-4 z-20">
         <div>
           <h2 className="text-3xl font-black italic text-white tracking-tighter uppercase leading-none">
@@ -82,6 +82,7 @@ export function AttributionView() {
 
       {/* Tabla */}
       <Card className="border-slate-900 bg-slate-950 overflow-hidden rounded-none">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-slate-900 hover:bg-transparent bg-slate-950">
@@ -142,6 +143,7 @@ export function AttributionView() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </Card>
     </div>
   );

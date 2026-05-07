@@ -159,11 +159,11 @@ export function LeadsView() {
   }, [dateRange]);
 
   return (
-    <div className="p-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 text-white selection:bg-blue-500/30">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#020617] sticky top-0 py-4 z-20 gap-4">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 text-white selection:bg-blue-500/30">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#020617] sticky top-0 py-3 md:py-4 z-20 gap-3 md:gap-4">
         <div>
-          <h2 className="text-3xl font-black italic text-white tracking-tighter uppercase font-cyber leading-none">Seguimiento de <span className="text-blue-400 not-italic">Leads</span> WhatsApp</h2>
-          <p className="text-slate-500 text-xs mt-2 uppercase tracking-widest font-bold">Señales Entrantes // Análisis en Tiempo Real</p>
+          <h2 className="text-2xl md:text-3xl font-black italic text-white tracking-tighter uppercase font-cyber leading-none">Seguimiento de <span className="text-blue-400 not-italic">Leads</span></h2>
+          <p className="text-slate-500 text-xs mt-1 uppercase tracking-widest font-bold">Señales Entrantes // Tiempo Real</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3 bg-slate-950 p-2 border border-slate-900 shadow-[0_0_15px_rgba(59,130,246,0.05)]">
@@ -197,6 +197,7 @@ export function LeadsView() {
       </div>
 
       <Card className="border-slate-900 bg-slate-950/40 shadow-2xl overflow-hidden rounded-none cyber-card">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-slate-900 hover:bg-transparent">
@@ -254,6 +255,7 @@ export function LeadsView() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </Card>
 
       <AnimatePresence>
@@ -313,11 +315,11 @@ export function SalesView() {
   };
 
   return (
-    <div className="p-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 text-white">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#020617] sticky top-0 py-4 z-20 gap-4">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 text-white">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#020617] sticky top-0 py-3 md:py-4 z-20 gap-3 md:gap-4">
         <div>
           <h2 className="text-2xl font-bold text-white tracking-tight">Historial de Ventas</h2>
-          <p className="text-slate-500 text-sm">Mostrando registros del rango seleccionado (Auto-refresco 2m)</p>
+          <p className="text-slate-500 text-xs">Auto-refresco cada 2 minutos</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3 bg-slate-950 p-2 rounded-2xl border border-slate-900">
@@ -351,6 +353,7 @@ export function SalesView() {
       </div>
 
       <Card className="border-slate-900 bg-slate-950 shadow-xl overflow-hidden rounded-2xl">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
               <TableRow className="bg-slate-900 border-slate-800">
@@ -473,6 +476,7 @@ export function SalesView() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </Card>
 
       <AnimatePresence>
