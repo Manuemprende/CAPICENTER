@@ -121,7 +121,7 @@ function normalizeN8nPayload(body: any) {
   const attrs = { ...contactAttrs, ...conversationAttrs };
   const labels = extractLabels(body);
 
-  const declaredType = cleanString(findField(body, ["eventType", "type", "tipo", "entity", "resource"])).toLowerCase();
+  const declaredType = cleanString(findField(body, ["eventType", "event", "type", "tipo", "entity", "resource"])).toLowerCase();
   const saleLabels = new Set(["pagado", "pagada", "paid", "compra", "comprado", "convertido", "venta"]);
   const isSale = declaredType.includes("sale") || declaredType.includes("venta") || labels.some((label) => saleLabels.has(label));
 
@@ -134,7 +134,7 @@ function normalizeN8nPayload(body: any) {
     attrs?.conversation_id,
   );
   const phone = firstPresent(
-    findField(body, ["phone", "telefono", "whatsapp", "celular", "contacto", "mobile", "numero", "waId"]),
+    findField(body, ["phone", "telefono", "telefono_wa", "whatsapp", "celular", "contacto", "mobile", "numero", "waId"]),
     contact?.phone_number,
     contact?.phone,
     attrs?.phone,
@@ -186,7 +186,7 @@ function normalizeN8nPayload(body: any) {
 
   if (isSale) {
     payload.amount = amount;
-    payload.externalId = firstPresent(findField(body, ["externalId", "id", "transaccion", "pedido", "orderId", "id_venta", "trans_id"]), attrs?.externalId, attrs?.external_id, conversationId ? `chatwoot-${conversationId}` : "");
+    payload.externalId = firstPresent(findField(body, ["externalId", "pedido_num", "order_id", "id", "transaccion", "pedido", "orderId", "id_venta", "trans_id"]), attrs?.externalId, attrs?.external_id, conversationId ? `chatwoot-${conversationId}` : "");
     payload.currency = firstPresent(findField(body, ["currency", "moneda", "divisa"]), attrs?.currency, "CLP");
     payload.paymentStatus = firstPresent(findField(body, ["paymentStatus", "pago_estado"]), attrs?.paymentStatus, "paid");
   }
