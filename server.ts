@@ -647,6 +647,9 @@ async function startServer() {
     const sale = await prisma.sale.findUnique({ where: { id: saleId } });
     if (!sale) return;
 
+    // Evitar duplicados: borrar matches previos antes de re-procesar
+    await prisma.attributionMatch.deleteMany({ where: { saleId } });
+
     let bestLeadId: string | null = null;
     let bestScore = 0;
     let matchType = "";
@@ -941,13 +944,13 @@ async function startServer() {
         where: { date: { gte: startDate, lte: endDate } }
       });
 
-      // 2. Obtener ventas atribuidas por anuncio
-      const sales = await prisma.sale.findMany({
-        where: { 
-          paymentStatus: 'paid',
-          createdAt: { gte: startDate, lte: endDate },
-          adId: { not: null }
-        }
+      // 2. Obtener ventas atribuidas - via Sale.adId o via Lead matcheado
+      const salesDirect = await prisma.sale.findMany({
+        where: { paymentStatus: 'paid', createdAt: { gte: startDate, lte: endDate }, adId: { not: null } }
+      });
+      const salesViaLead = await prisma.attributionMatch.findMany({
+        where: { sale: { paymentStatus: 'paid', createdAt: { gte: startDate, lte: endDate } } },
+        include: { sale: true, lead: { select: { adId: true, adName: true } } }
       });
 
       // 3. Consolidar por Ad ID
@@ -955,28 +958,31 @@ async function startServer() {
 
       performance.forEach(p => {
         if (!adMap[p.adId]) {
-          adMap[p.adId] = { 
-            adId: p.adId, 
-            adName: p.adName, 
-            spend: 0, 
-            metaSales: 0, 
-            realSales: 0, 
-            revenue: 0,
-            capiSent: 0 
-          };
+          adMap[p.adId] = { adId: p.adId, adName: p.adName, spend: 0, metaSales: 0, realSales: 0, revenue: 0, capiSent: 0 };
         }
         adMap[p.adId].spend += p.spend;
         adMap[p.adId].metaSales += p.metaConversions;
       });
 
-      sales.forEach(s => {
+      // Ventas con adId directo en Sale
+      salesDirect.forEach(s => {
         const adId = s.adId!;
-        if (!adMap[adId]) {
-          adMap[adId] = { adId, adName: s.adName, spend: 0, metaSales: 0, realSales: 0, revenue: 0, capiSent: 0 };
-        }
+        if (!adMap[adId]) adMap[adId] = { adId, adName: s.adName, spend: 0, metaSales: 0, realSales: 0, revenue: 0, capiSent: 0 };
         adMap[adId].realSales += 1;
         adMap[adId].revenue += s.amount;
         if (s.capiStatus === 'sent') adMap[adId].capiSent += 1;
+      });
+
+      // Ventas atribuidas via Lead (adId en el Lead matcheado)
+      const seenSales = new Set(salesDirect.map(s => s.id));
+      salesViaLead.forEach(m => {
+        if (seenSales.has(m.saleId) || !m.lead?.adId) return;
+        seenSales.add(m.saleId);
+        const adId = m.lead.adId;
+        if (!adMap[adId]) adMap[adId] = { adId, adName: m.lead.adName, spend: 0, metaSales: 0, realSales: 0, revenue: 0, capiSent: 0 };
+        adMap[adId].realSales += 1;
+        adMap[adId].revenue += m.sale.amount;
+        if (m.sale.capiStatus === 'sent') adMap[adId].capiSent += 1;
       });
 
       const result = Object.values(adMap).map(ad => {
