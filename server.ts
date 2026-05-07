@@ -1070,6 +1070,29 @@ async function startServer() {
     }
   });
 
+  // PATCH /api/sales/:id/amount — actualizar monto de una venta y reintentar CAPI
+  app.patch("/api/sales/:id/amount", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { amount } = req.body;
+      if (!amount || Number(amount) <= 0) return res.status(400).json({ error: "amount must be > 0" });
+
+      const sale = await prisma.sale.update({
+        where: { id },
+        data: { amount: Number(amount), paymentStatus: "paid", capiStatus: "pending" }
+      });
+      // Re-run attribution with new amount
+      await processAttribution(sale.id);
+      const updated = await prisma.sale.findUnique({ where: { id } });
+      if (updated?.isScalable) {
+        sendToCapi(sale.id).catch(err => console.error(`[CAPI] retry failed:`, err));
+      }
+      res.json({ success: true, sale: updated });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // GET /api/settings/meta
   app.get("/api/settings/meta", async (req, res) => {
     try {
