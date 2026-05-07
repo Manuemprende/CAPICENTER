@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 interface SidebarProps {
   currentView: string;
   onViewChange: (view: string) => void;
+  onLogout?: () => void;
 }
 
 const navItems = [
@@ -21,7 +22,7 @@ const navItems = [
   { id: 'settings', label: 'Configuración', icon: Settings },
 ];
 
-export function Sidebar({ currentView, onViewChange }: SidebarProps) {
+export function Sidebar({ currentView, onViewChange, onLogout }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
@@ -116,6 +117,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             "w-full text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors h-9",
             isCollapsed ? "justify-center px-0" : "justify-start gap-2 px-3"
           )}
+          onClick={onLogout}
           title={isCollapsed ? "Cerrar Sesión" : undefined}
         >
           <LogOut className="h-3.5 w-3.5 shrink-0" />

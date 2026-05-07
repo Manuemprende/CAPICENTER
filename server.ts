@@ -265,6 +265,31 @@ async function startServer() {
     res.json({ status: "ok", version: "1.0.0", timestamp: new Date().toISOString() });
   });
 
+  // POST /api/auth/login
+  app.post("/api/auth/login", (req, res) => {
+    const { password } = req.body;
+    const ADMIN_PASS = process.env.ADMIN_PASSWORD || "wentix2026";
+    if (password === ADMIN_PASS) {
+      const token = Buffer.from(`wentix:${Date.now()}:${ADMIN_PASS}`).toString("base64");
+      res.json({ success: true, token });
+    } else {
+      res.status(401).json({ error: "Credenciales incorrectas" });
+    }
+  });
+
+  // GET /api/auth/me — verifica si el token es válido
+  app.get("/api/auth/me", (req, res) => {
+    const auth = req.headers.authorization?.replace("Bearer ", "") || "";
+    const ADMIN_PASS = process.env.ADMIN_PASSWORD || "wentix2026";
+    try {
+      const decoded = Buffer.from(auth, "base64").toString("utf-8");
+      if (decoded.startsWith("wentix:") && decoded.endsWith(`:${ADMIN_PASS}`)) {
+        return res.json({ authenticated: true });
+      }
+    } catch {}
+    res.status(401).json({ authenticated: false });
+  });
+
   // POST /api/admin/enrich-leads — enriquece todos los leads con adId sin campaignName
   app.post("/api/admin/enrich-leads", async (req, res) => {
     try {
