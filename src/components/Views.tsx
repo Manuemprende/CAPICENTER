@@ -223,9 +223,11 @@ export function LeadsView() {
                   <div className="text-[9px] text-blue-400 font-bold mt-1 font-mono">{lead.phoneNormalized}</div>
                 </TableCell>
                 <TableCell>
-                   <div className="text-slate-200 font-bold text-xs truncate max-w-[150px] uppercase">{lead.campaignName || 'Señal Orgánica'}</div>
+                   <div className="text-slate-200 font-bold text-xs truncate max-w-[150px] uppercase">
+                     {lead.campaignName || (lead.adId ? 'Meta Ads' : 'Orgánico')}
+                   </div>
                    <div className="text-[9px] text-slate-600 font-bold mt-1 uppercase tracking-tighter">
-                     {lead.adsetName || 'DEFAULT_SET'} {lead.adName ? ` // ${lead.adName}` : ''}
+                     {lead.adId ? `AD::${lead.adId.slice(-8)}` : (lead.adsetName || 'SIN ANUNCIO')}
                    </div>
                 </TableCell>
                 <TableCell>
