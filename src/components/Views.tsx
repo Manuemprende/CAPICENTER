@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { RefreshCw, Eye, X, Shield, Globe, MessageSquare, Tag, Terminal, Database } from 'lucide-react';
+import { RefreshCw, Eye, X, Shield, Globe, MessageSquare, Tag, Terminal, Database, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 function TechnicalInspector({ data, onClose }: { data: any, onClose: () => void }) {
@@ -125,6 +125,61 @@ function TechnicalInspector({ data, onClose }: { data: any, onClose: () => void 
   );
 }
 
+function LeadCard({ lead, onInspect }: { lead: any; onInspect: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="bg-slate-950 border border-slate-900 rounded-none overflow-hidden">
+      {/* Fila principal — siempre visible */}
+      <div className="flex items-center justify-between p-4 gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="font-black text-white uppercase text-sm truncate">{lead.customerName || 'Desconocido'}</div>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="font-mono text-[11px] text-blue-400">{lead.phone}</span>
+            <Badge variant="outline" className="text-[7px] border-slate-800 text-slate-500 h-3.5 uppercase rounded-none font-black px-1">
+              {lead.country || 'CL'}
+            </Badge>
+            {lead.campaignName && (
+              <span className="text-[9px] text-slate-500 uppercase truncate max-w-[120px]">{lead.campaignName}</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-blue-400 border border-slate-900 rounded-none" onClick={onInspect}>
+            <Eye className="h-3.5 w-3.5" />
+          </Button>
+          <button onClick={() => setExpanded(!expanded)} className="h-8 w-8 flex items-center justify-center text-slate-600 hover:text-slate-300 border border-slate-900 rounded-none">
+            {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Detalles expandibles */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden border-t border-slate-900">
+            <div className="p-4 grid grid-cols-2 gap-3 bg-black/30">
+              {[
+                { label: 'Etapa', value: lead.stage || 'Captación' },
+                { label: 'ctwaClid', value: lead.ctwaClid ? lead.ctwaClid.slice(0, 16) + '...' : '—' },
+                { label: 'Ad ID', value: lead.adId || '—' },
+                { label: 'Adset', value: lead.adsetName || '—' },
+                { label: 'Conv. ID', value: lead.conversationId || '—' },
+                { label: 'Fecha', value: lead.createdAt ? format(new Date(lead.createdAt), 'dd/MM HH:mm') : '—' },
+              ].map((item, i) => (
+                <div key={i} className="bg-slate-900/50 p-2 rounded-none">
+                  <div className="text-[8px] text-slate-600 font-black uppercase tracking-wider mb-0.5">{item.label}</div>
+                  <div className="text-[10px] text-slate-300 font-mono truncate">{item.value}</div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function LeadsView() {
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,7 +251,15 @@ export function LeadsView() {
         </div>
       </div>
 
-      <Card className="border-slate-900 bg-slate-950/40 shadow-2xl overflow-hidden rounded-none cyber-card">
+      {/* MOBILE: Tarjetas expandibles */}
+      <div className="md:hidden space-y-2">
+        {leads.map((lead) => (
+          <LeadCard key={lead.id} lead={lead} onInspect={() => setInspecting(lead)} />
+        ))}
+      </div>
+
+      {/* DESKTOP: Tabla completa */}
+      <Card className="hidden md:block border-slate-900 bg-slate-950/40 shadow-2xl overflow-hidden rounded-none cyber-card">
         <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -204,7 +267,7 @@ export function LeadsView() {
               <TableHead className="font-black text-[10px] uppercase text-slate-500 tracking-widest py-5 pl-8">Identidad Entrante</TableHead>
               <TableHead className="font-black text-[10px] uppercase text-slate-500 tracking-widest">Fuente de Señal</TableHead>
               <TableHead className="font-black text-[10px] uppercase text-slate-500 tracking-widest">Malla de Campaña</TableHead>
-              <TableHead className="font-black text-[10px] uppercase text-slate-500 tracking-widest text-center">Seguimiento de Estado</TableHead>
+              <TableHead className="font-black text-[10px] uppercase text-slate-500 tracking-widest text-center">Estado</TableHead>
               <TableHead className="font-black text-[10px] uppercase text-slate-500 tracking-widest text-right pr-8">Inspeccionar</TableHead>
             </TableRow>
           </TableHeader>
@@ -212,44 +275,23 @@ export function LeadsView() {
             {leads.map((lead) => (
               <TableRow key={lead.id} className="hover:bg-blue-500/[0.012] border-slate-900/50 transition-all group">
                 <TableCell className="pl-8 py-5">
-                  <div className="font-black text-slate-200 group-hover:text-white uppercase tracking-tight text-xs transition-colors">{lead.customerName || 'Nodo_Desconocido'}</div>
-                  <div className="flex items-center gap-1 mt-1.5">
-                    <Badge variant="outline" className="text-[8px] border-slate-800 text-slate-500 h-4 uppercase rounded-none font-black tracking-widest bg-slate-900/50">
-                      GEO::{lead.country || 'Global'}
-                    </Badge>
-                  </div>
+                  <div className="font-black text-slate-200 group-hover:text-white uppercase tracking-tight text-xs">{lead.customerName || 'Desconocido'}</div>
+                  <Badge variant="outline" className="text-[8px] border-slate-800 text-slate-500 h-4 uppercase rounded-none font-black mt-1.5">GEO::{lead.country || 'CL'}</Badge>
                 </TableCell>
                 <TableCell>
-                  <div className="font-mono text-xs font-bold text-slate-400 tracking-tighter">{lead.phone}</div>
-                  <div className="text-[9px] text-blue-400 font-bold mt-1 font-mono">{lead.phoneNormalized}</div>
+                  <div className="font-mono text-xs font-bold text-slate-400">{lead.phone}</div>
                 </TableCell>
                 <TableCell>
-                   <div className="text-slate-200 font-bold text-xs truncate max-w-[150px] uppercase">
-                     {lead.campaignName || (lead.adId ? 'Meta Ads' : 'Orgánico')}
-                   </div>
-                   <div className="text-[9px] text-slate-600 font-bold mt-1 uppercase tracking-tighter">
-                     {lead.adId ? `AD::${lead.adId.slice(-8)}` : (lead.adsetName || 'SIN ANUNCIO')}
-                   </div>
+                  <div className="text-slate-200 font-bold text-xs truncate max-w-[150px] uppercase">{lead.campaignName || (lead.adId ? 'Meta Ads' : 'Orgánico')}</div>
+                  <div className="text-[9px] text-slate-600 font-bold mt-1">{lead.adId ? `AD::${lead.adId.slice(-8)}` : ''}</div>
                 </TableCell>
-                <TableCell>
-                  <div className="flex flex-col items-center gap-1.5">
-                    <Badge className="w-fit text-[9px] bg-blue-600/10 text-blue-400 uppercase border border-blue-500/20 h-4 rounded-none font-black tracking-widest shadow-[0_0_10px_rgba(37,99,235,0.1)]">
-                      {lead.stage || 'Captación'}
-                    </Badge>
-                    <div className="text-[8px] font-mono text-slate-700 truncate max-w-[80px] font-bold group-hover:text-slate-500 transition-colors">
-                      {lead.conversationId ? `CONV_ID::${lead.conversationId.slice(-6)}` : '#'+lead.id.substring(0,6)}
-                    </div>
-                  </div>
+                <TableCell className="text-center">
+                  <Badge className="text-[9px] bg-blue-600/10 text-blue-400 border border-blue-500/20 h-4 rounded-none font-black">{lead.stage || 'Captación'}</Badge>
                 </TableCell>
                 <TableCell className="text-right pr-8">
-                   <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-9 w-9 text-slate-600 hover:text-blue-400 hover:bg-blue-500/10 rounded-none border border-slate-900 hover:border-blue-500/30 transition-all"
-                    onClick={() => setInspecting(lead)}
-                   >
-                     <Eye className="h-4 w-4" />
-                   </Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-600 hover:text-blue-400 hover:bg-blue-500/10 rounded-none border border-slate-900" onClick={() => setInspecting(lead)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -352,7 +394,53 @@ export function SalesView() {
         </div>
       </div>
 
-      <Card className="border-slate-900 bg-slate-950 shadow-xl overflow-hidden rounded-2xl">
+      {/* MOBILE: Tarjetas de ventas */}
+      <div className="md:hidden space-y-2">
+        {sales.map((sale) => (
+          <div key={sale.id} className="bg-slate-950 border border-slate-900 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-lg font-black text-white font-mono">
+                    {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(sale.amount)}
+                  </span>
+                  <div className={cn("h-1.5 w-1.5 rounded-full shrink-0",
+                    sale.capiStatus === 'sent' ? 'bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]' :
+                    sale.capiStatus === 'failed' ? 'bg-red-500' : 'bg-slate-700'
+                  )} />
+                  <span className={cn("text-[8px] font-black uppercase",
+                    sale.capiStatus === 'sent' ? 'text-blue-400' : sale.capiStatus === 'failed' ? 'text-red-500' : 'text-slate-600'
+                  )}>{sale.capiStatus === 'sent' ? 'CAPI OK' : sale.capiStatus === 'failed' ? 'CAPI ERR' : 'PENDIENTE'}</span>
+                </div>
+                <div className="font-black text-slate-200 uppercase text-sm mt-1">{sale.customerName || 'Sin nombre'}</div>
+                <div className="font-mono text-[10px] text-slate-500 mt-0.5">{sale.phone}</div>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <Badge className="text-[8px] bg-blue-500/10 text-blue-400 border-blue-500/20 rounded-none font-black h-4">
+                    {sale.attributionStatus === 'strong_match' ? 'MATCH FUERTE' : sale.attributionStatus === 'attributed' ? 'ATRIBUIDO' : sale.attributionStatus?.replace('_',' ') || 'SIN MATCH'}
+                  </Badge>
+                  {sale.stage && <Badge variant="outline" className="text-[8px] border-slate-800 text-slate-500 h-4 rounded-none">{sale.stage}</Badge>}
+                  <span className="text-[9px] text-slate-600 font-mono">{format(new Date(sale.createdAt), 'dd/MM HH:mm')}</span>
+                </div>
+                {sale.campaignName && <div className="text-[9px] text-slate-600 mt-1 truncate">{sale.campaignName}</div>}
+              </div>
+              <div className="flex flex-col gap-2 shrink-0">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-blue-400 border border-slate-900 rounded-none" onClick={() => setInspecting(sale)}>
+                  <Eye className="h-3.5 w-3.5" />
+                </Button>
+                {(sale.capiStatus === 'failed' || sale.capiStatus === 'pending') && sale.attributionStatus !== 'no_match' && (
+                  <Button size="sm" variant="ghost" className="h-6 text-[8px] font-bold text-blue-400 border border-blue-500/20 px-2 rounded-none"
+                    onClick={() => handleRetry(sale.id)} disabled={retryingIds.has(sale.id)}>
+                    {retryingIds.has(sale.id) ? <RefreshCw className="h-3 w-3 animate-spin" /> : 'RETRY'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* DESKTOP: Tabla completa */}
+      <Card className="hidden md:block border-slate-900 bg-slate-950 shadow-xl overflow-hidden rounded-2xl">
         <div className="overflow-x-auto">
         <Table>
           <TableHeader>
