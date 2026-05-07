@@ -194,6 +194,31 @@ function normalizeN8nPayload(body: any) {
   return { kind: isSale ? "sales" : "leads", payload, labels };
 }
 
+async function enrichLeadAdData(leadId: string, adId: string) {
+  try {
+    const config = await prisma.metaConfig.findFirst({ where: { active: true } });
+    if (!config) return;
+    const token = decrypt(config.accessToken);
+    const { data } = await axios.get(
+      `https://graph.facebook.com/v17.0/${adId}?fields=name,campaign{name,id},adset{name,id}&access_token=${token}`,
+      { timeout: 8000 }
+    );
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        adName:       data.name             || null,
+        campaignId:   data.campaign?.id     || null,
+        campaignName: data.campaign?.name   || null,
+        adsetId:      data.adset?.id        || null,
+        adsetName:    data.adset?.name      || null,
+      }
+    });
+    console.log(`[AD ENRICH] Lead ${leadId} enriquecido: ${data.campaign?.name} / ${data.name}`);
+  } catch (err: any) {
+    console.warn(`[AD ENRICH] Falló para lead ${leadId}:`, err.message);
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -445,6 +470,11 @@ async function startServer() {
           metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
         }
       });
+
+      // Enriquecer con datos de campaña desde Meta API en background
+      if (lead.adId && !lead.campaignName) {
+        enrichLeadAdData(lead.id, lead.adId).catch(() => {});
+      }
 
       res.json({ success: true, lead });
     } catch (error: any) {
