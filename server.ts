@@ -995,6 +995,56 @@ async function startServer() {
     }
   });
 
+  // POST /api/admin/sync-ads — Sincroniza gasto real desde Meta Ads API
+  app.post("/api/admin/sync-ads", async (req, res) => {
+    const { date_preset = "last_7d" } = req.body || {};
+    const FB = "https://graph.facebook.com/v17.0";
+
+    const ADMINS = [
+      { name: "Franco",   token: process.env.ADS_TOKEN_FRANCO   || "", account: "act_1245711336722227" },
+      { name: "DropDrop", token: process.env.ADS_TOKEN_DROPDROP || "", account: "act_4026292580960461" },
+      { name: "Torres",   token: process.env.ADS_TOKEN_TORRES   || "", account: "act_1270507831043744" },
+    ].filter(a => a.token);
+
+    if (!ADMINS.length) {
+      const tokens: string[] = (() => { try { return JSON.parse(process.env.FACEBOOK_ADS_TOKENS || "[]"); } catch { return []; } })();
+      const accounts = ["act_1245711336722227","act_4026292580960461","act_1270507831043744"];
+      tokens.forEach((t, i) => { if (t && accounts[i]) ADMINS.push({ name: `Admin${i+1}`, token: t, account: accounts[i] }); });
+    }
+
+    let synced = 0, errors = 0;
+    for (const admin of ADMINS) {
+      try {
+        const url = `${FB}/${admin.account}/insights?level=ad&fields=ad_id,ad_name,spend,impressions,clicks,actions,action_values&date_preset=${date_preset}&time_increment=1&limit=500&access_token=${admin.token}`;
+        const resp = await axios.get(url, { timeout: 30000 });
+        const rows: any[] = resp.data?.data || [];
+
+        for (const row of rows) {
+          if (!row.ad_id || !row.date_start) continue;
+          const date = new Date(row.date_start);
+          date.setHours(0, 0, 0, 0);
+          const spend = parseFloat(row.spend || "0");
+          const impressions = parseInt(row.impressions || "0");
+          const clicks = parseInt(row.clicks || "0");
+          const getN = (arr: any[], t: string) => arr?.find((a: any) => a.action_type === t)?.value || 0;
+          const metaConversions = Math.round(parseFloat(getN(row.actions, "purchase") || getN(row.actions, "onsite_conversion.messaging_first_reply") || "0"));
+
+          await prisma.adPerformance.upsert({
+            where: { adId_date: { adId: row.ad_id, date } },
+            update: { adName: row.ad_name, spend, impressions, clicks, metaConversions },
+            create: { adId: row.ad_id, adName: row.ad_name, date, spend, impressions, clicks, metaConversions },
+          });
+          synced++;
+        }
+        console.log(`[SYNC ADS] ${admin.name}: ${rows.length} registros`);
+      } catch (e: any) {
+        console.error(`[SYNC ADS] Error ${admin.name}:`, e.message);
+        errors++;
+      }
+    }
+    res.json({ success: true, synced, errors, admins: ADMINS.length });
+  });
+
   // POST /api/performance/seed
   app.get("/api/performance/seed", async (req, res) => {
     try {
