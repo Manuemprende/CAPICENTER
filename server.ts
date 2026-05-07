@@ -300,6 +300,25 @@ async function startServer() {
     }
   });
 
+  // POST /api/webhooks/profitbot — endpoint sin auth para profit_aibot
+  app.post("/api/webhooks/profitbot", async (req, res) => {
+    try {
+      const normalized = normalizeN8nPayload(req.body);
+      const business = await prisma.business.findFirst();
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      const internalKey = await prisma.apiKey.findFirst({ where: { businessId: business.id, active: true } });
+      if (!internalKey) return res.status(500).json({ error: "No API key configured" });
+      const targetUrl = `http://127.0.0.1:${PORT}/api/webhooks/${normalized.kind}`;
+      const response = await axios.post(targetUrl, normalized.payload, {
+        headers: { "x-api-key": internalKey.key },
+        validateStatus: () => true,
+      });
+      res.status(response.status).json({ success: response.status >= 200 && response.status < 300, routedTo: normalized.kind, result: response.data });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // POST /api/webhooks/n8n
   // Single ingress for Chatwoot/n8n. It infers leads vs sales and reuses the
   // existing typed webhook handlers so dedupe, attribution and CAPI stay aligned.
