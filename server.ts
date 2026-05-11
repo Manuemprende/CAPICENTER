@@ -1032,9 +1032,13 @@ async function startServer() {
         prisma.sale.count({ where: { ...paidWhere, capiStatus: "failed" } }),
         // sent + duplicate_blocked = llegaron a Meta
         prisma.sale.count({ where: { ...paidWhere, capiStatus: { in: ["sent", "duplicate_blocked"] } } }),
-        prisma.adPerformance.aggregate({ 
-          where: { date: { gte: startDate, lte: endDate } }, 
-          _sum: { spend: true, impressions: true, clicks: true, metaConversions: true } 
+        // AdPerformance usa fechas en UTC midnight — usar UTC midnight para el filtro
+        prisma.adPerformance.aggregate({
+          where: { date: {
+            gte: new Date(startDate.toISOString().slice(0,10) + 'T00:00:00.000Z'),
+            lte: new Date(endDate.toISOString().slice(0,10) + 'T23:59:59.999Z')
+          }},
+          _sum: { spend: true, impressions: true, clicks: true, metaConversions: true }
         }),
         prisma.lead.findMany({ where, take: 5, orderBy: { createdAt: "desc" } }),
         prisma.sale.findMany({ where, take: 5, orderBy: { createdAt: "desc" }, include: { matches: true } }),
@@ -1142,9 +1146,11 @@ async function startServer() {
       const startDate = parseDateParam(from);
       const endDate = parseDateParam(to, true);
 
-      // 1. Obtener gasto por anuncio
+      // 1. Obtener gasto por anuncio (usar UTC midnight para AdPerformance)
+      const adStartDate = new Date(startDate.toISOString().slice(0,10) + 'T00:00:00.000Z');
+      const adEndDate   = new Date(endDate.toISOString().slice(0,10)   + 'T23:59:59.999Z');
       const performance = await prisma.adPerformance.findMany({
-        where: { date: { gte: startDate, lte: endDate } }
+        where: { date: { gte: adStartDate, lte: adEndDate } }
       });
 
       // 2. Obtener ventas atribuidas - via Sale.adId o via Lead matcheado
