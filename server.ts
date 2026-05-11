@@ -426,24 +426,27 @@ async function startServer() {
     }
   });
 
-  // POST /api/admin/reattribute-sales — re-procesa atribución y copia datos del lead al sale
+  // POST /api/admin/reattribute-sales — re-procesa atribución para todas las ventas pendientes
   app.post("/api/admin/reattribute-sales", async (_req: express.Request, res: express.Response) => {
     try {
-      // Buscar ventas que tienen match pero les faltan campos del lead
+      // Procesar: no_match (pueden tener leads ahora), strong_match sin adId, y pending capiStatus
       const sales = await prisma.sale.findMany({
         where: {
-          attributionStatus: { in: ["strong_match", "attributed"] },
-          adId: null  // les falta el adId del lead
+          OR: [
+            { attributionStatus: "no_match" },
+            { attributionStatus: "manual_review" },
+            { attributionStatus: { in: ["strong_match", "attributed"] }, adId: null },
+          ]
         },
-        take: 200
+        take: 500
       });
       res.json({ message: `Re-attributing ${sales.length} sales in background` });
-      let updated = 0;
+      let matched = 0;
       for (const sale of sales) {
         await processAttribution(sale.id).catch(() => {});
-        updated++;
+        matched++;
       }
-      console.log(`[REATTRIBUTE] Updated ${updated} sales`);
+      console.log(`[REATTRIBUTE] Processed ${matched} sales`);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
