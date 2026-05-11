@@ -1440,11 +1440,27 @@ async function startServer() {
       return;
     }
 
-    // 1. Match by inboxId (sale.whatsappId = Chatwoot inbox_id enviado desde n8n)
+    // 1. Match by Chatwoot inboxId (sale.whatsappId = Chatwoot inbox_id)
     let config = sale.whatsappId
       ? sale.business.metaConfigs.find(c => c.active && c.inboxId && c.inboxId === sale.whatsappId)
       : undefined;
-    // 2. Fallback: any active config
+
+    // 2. Si no matcheó por inboxId, intentar por phoneNumber del MetaConfig
+    //    vs el whatsappId del lead matcheado (que puede ser el display_phone de la línea WhatsApp)
+    if (!config) {
+      const matchedLead = await prisma.attributionMatch.findFirst({
+        where: { saleId: sale.id },
+        include: { lead: { select: { whatsappId: true } } }
+      });
+      const leadPhone = matchedLead?.lead?.whatsappId;
+      if (leadPhone) {
+        config = sale.business.metaConfigs.find(c =>
+          c.active && c.phoneNumber && normalizePhone(c.phoneNumber) === normalizePhone(leadPhone)
+        );
+      }
+    }
+
+    // 3. Fallback: cualquier config activa
     if (!config) config = sale.business.metaConfigs.find(c => c.active);
     
     if (!config) return;
