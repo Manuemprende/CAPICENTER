@@ -1030,7 +1030,8 @@ async function startServer() {
         prisma.sale.count({ where: paidWhere }),
         prisma.sale.count({ where: { ...paidWhere, attributionStatus: { in: ["strong_match", "attributed", "weak_match"] } } }),
         prisma.sale.count({ where: { ...paidWhere, capiStatus: "failed" } }),
-        prisma.sale.count({ where: { ...paidWhere, capiStatus: "sent" } }),
+        // sent + duplicate_blocked = llegaron a Meta
+        prisma.sale.count({ where: { ...paidWhere, capiStatus: { in: ["sent", "duplicate_blocked"] } } }),
         prisma.adPerformance.aggregate({ 
           where: { date: { gte: startDate, lte: endDate } }, 
           _sum: { spend: true, impressions: true, clicks: true, metaConversions: true } 
@@ -1380,6 +1381,24 @@ async function startServer() {
     }
   });
 
+  // POST /api/admin/retry-duplicate-blocked — re-envía ventas duplicate_blocked que ahora tienen ctwaClid
+  app.post("/api/admin/retry-duplicate-blocked", async (_req: express.Request, res: express.Response) => {
+    try {
+      const sales = await prisma.sale.findMany({
+        where: { capiStatus: "duplicate_blocked", ctwaClid: { not: null }, isScalable: true },
+        take: 100
+      });
+      res.json({ message: `Retrying ${sales.length} duplicate-blocked sales with ctwaClid` });
+      for (const sale of sales) {
+        // Reset capiStatus para que sendToCapi no lo saltee
+        await prisma.sale.update({ where: { id: sale.id }, data: { capiStatus: "pending" } });
+        await sendToCapi(sale.id).catch(() => {});
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // POST /api/capi/retry/:saleId
   app.post("/api/capi/retry/:saleId", async (req, res) => {
     try {
@@ -1401,9 +1420,15 @@ async function startServer() {
     if (!sale || !sale.isScalable) return;
     
     // Check if CAPI is already sent successfully
-    const eventId = `purchase_${sale.id}_${sale.phoneNormalized}`;
+    // Si la venta tiene ctwaClid, usar un event_id único que lo incluya
+    // Esto permite re-enviar con más datos sin ser bloqueado como duplicado del envío anterior (sin ctwa_clid)
+    const ctwaClid0 = sale.ctwaClid;
+    const eventId = ctwaClid0
+      ? `purchase_${sale.id}_${sale.phoneNormalized}_ctwa`
+      : `purchase_${sale.id}_${sale.phoneNormalized}`;
+
     const existingEntry = await prisma.capiEvent.findUnique({ where: { eventId } });
-    
+
     if (existingEntry && existingEntry.status === "sent") {
       await prisma.sale.update({ where: { id: sale.id }, data: { capiStatus: "duplicate_blocked" } });
       return;
