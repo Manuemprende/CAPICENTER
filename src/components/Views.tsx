@@ -12,6 +12,11 @@ import { motion, AnimatePresence } from 'motion/react';
 function TechnicalInspector({ data, onClose }: { data: any, onClose: () => void }) {
   if (!data) return null;
 
+  // Detectar si es Lead o Sale por los campos disponibles
+  const isSale = data.amount !== undefined && data.attributionStatus !== undefined;
+  const fmt = (v: number) => `$${new Intl.NumberFormat('es-CL').format(v)}`;
+  const fmtDate = (v: any) => v ? format(new Date(v), 'dd/MM/yyyy HH:mm:ss') : null;
+
   const sections = [
     {
       title: "Información General",
@@ -19,34 +24,39 @@ function TechnicalInspector({ data, onClose }: { data: any, onClose: () => void 
       fields: [
         { label: "Nombre Cliente", value: data.customerName },
         { label: "Teléfono", value: data.phone },
-        { label: "Normalizado", value: data.phoneNormalized },
         { label: "País", value: data.country },
+        ...(isSale ? [{ label: "Monto", value: fmt(data.amount) }] : []),
       ]
     },
     {
       title: "Datos de Anuncio (Meta)",
       icon: <Tag className="h-4 w-4" />,
       fields: [
+        { label: "Campaña", value: data.campaignName },
+        { label: "Adset", value: data.adsetName },
+        { label: "Anuncio", value: data.adName },
         { label: "ID Anuncio", value: data.adId },
-        { label: "Nombre Anuncio", value: data.adName },
-        { label: "Headline (Título)", value: data.adHeadline },
+        { label: "Headline", value: data.adHeadline },
         { label: "URL Anuncio", value: data.adUrl, isLink: true },
-        { label: "CLID Click-to-WhatsApp", value: data.ctwaClid },
+        { label: "CLID (ctwa_clid)", value: data.ctwaClid },
       ]
     },
     {
-      title: "Estado CAPI / Venta Atribuida",
+      title: "Estado CAPI",
       icon: <Terminal className="h-4 w-4" />,
-      fields: [
-        { label: "CAPI Status", value: data.capiStatus || (data.saleId ? 'ver venta' : null) },
-        { label: "Venta ID", value: data.saleId || null },
-        { label: "Monto Venta", value: data.saleAmount != null ? `$${new Intl.NumberFormat('es-CL').format(data.saleAmount)}` : null },
-        { label: "Atribución", value: data.saleAttributionStatus || null },
-        { label: "ID Evento Meta", value: data.metaEventId || null },
-        { label: "Error Meta", value: data.metaError || data.saleMetaError || null },
-        { label: "Fecha Envío Meta", value: (data.fechaEnvioMeta || data.saleFechaEnvioMeta)
-            ? format(new Date(data.fechaEnvioMeta || data.saleFechaEnvioMeta), 'dd/MM/yyyy HH:mm:ss')
-            : null },
+      fields: isSale ? [
+        // Inspector de VENTA — datos propios
+        { label: "CAPI Status", value: data.capiStatus },
+        { label: "Atribución", value: data.attributionStatus },
+        { label: "Es Escalable", value: data.isScalable ? "SÍ" : "NO" },
+        { label: "Fecha Envío", value: fmtDate(data.fechaEnvioMeta) },
+        { label: "Error Meta", value: data.metaError },
+      ] : [
+        // Inspector de LEAD — datos de la venta atribuida
+        { label: "CAPI Status", value: data.capiStatus },
+        { label: "Monto Venta", value: data.saleAmount != null ? fmt(data.saleAmount) : null },
+        { label: "Atribución Venta", value: data.saleAttributionStatus },
+        { label: "Fecha Envío", value: fmtDate(data.saleFechaEnvioMeta) },
       ]
     },
     {
@@ -55,12 +65,14 @@ function TechnicalInspector({ data, onClose }: { data: any, onClose: () => void 
       fields: [
         { label: "ID Conversación", value: data.conversationId },
         { label: "Etapa / Stage", value: data.stage },
-        { label: "Convertido", value: data.isConverted },
-        { label: "Intentos Reintento", value: data.intentosReintento },
-        { label: "Revisión Manual", value: data.requiereRevisionManual ? "SÍ" : "NO" },
+        { label: "WhatsApp Inbox", value: data.whatsappId },
+        ...(data.requiereRevisionManual ? [{ label: "Revisión Manual", value: "SÍ" }] : []),
       ]
     }
-  ];
+  ]
+  // Filtrar secciones sin datos y campos vacíos
+  .map(s => ({ ...s, fields: s.fields.filter(f => f.value != null && f.value !== '' && f.value !== false) }))
+  .filter(s => s.fields.length > 0);
 
   return (
     <motion.div 
@@ -103,14 +115,11 @@ function TechnicalInspector({ data, onClose }: { data: any, onClose: () => void 
                 {section.fields.map((f, fIdx) => (
                   <div key={fIdx} className="bg-black/50 p-3 rounded-xl border border-zinc-900/50">
                     <div className="text-[10px] text-zinc-500 font-bold mb-1 uppercase tracking-tight">{f.label}</div>
-                    <div className={cn(
-                      "text-sm font-mono break-all",
-                      f.value ? "text-zinc-200" : "text-zinc-600 italic"
-                    )}>
+                    <div className="text-sm font-mono break-all text-zinc-200">
                       {f.isLink && f.value ? (
-                        <a href={f.value} target="_blank" rel="noreferrer" className="text-blue-400 underline hover:text-blue-300">Ver Enlace</a>
+                        <a href={String(f.value)} target="_blank" rel="noreferrer" className="text-blue-400 underline hover:text-blue-300">Ver Enlace</a>
                       ) : (
-                        String(f.value || 'Sin Dato')
+                        String(f.value)
                       )}
                     </div>
                   </div>
