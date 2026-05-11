@@ -4,6 +4,9 @@ import path from "path";
 import axios from "axios";
 import { PrismaClient } from "@prisma/client";
 import cors from "cors";
+import { syncGoogleSheets } from "./src/lib/sync-sheets.ts";
+
+
 
 const prisma = new PrismaClient();
 
@@ -26,26 +29,45 @@ function normalizePhone(phone: string): string {
 function parseAmount(value: any): number {
   const raw = cleanString(value);
   if (!raw) return 0;
-  const normalized = raw.replace(/[^\d,.-]/g, "");
+  let normalized = raw.replace(/[^\d,.-]/g, "");
+  const negative = normalized.startsWith("-");
+  normalized = normalized.replace(/-/g, "");
   const hasComma = normalized.includes(",");
   const hasDot = normalized.includes(".");
 
   if (hasComma && hasDot) {
-    return Number(normalized.replace(/\./g, "").replace(",", "."));
+    const lastComma = normalized.lastIndexOf(",");
+    const lastDot = normalized.lastIndexOf(".");
+    const decimalSeparator = lastComma > lastDot ? "," : ".";
+    const thousandsSeparator = decimalSeparator === "," ? "." : ",";
+    const parsed = Number(
+      normalized
+        .replace(new RegExp(`\\${thousandsSeparator}`, "g"), "")
+        .replace(decimalSeparator, ".")
+    );
+    return negative ? -parsed : parsed;
   }
 
   if (hasComma) {
-    return Number(normalized.replace(",", "."));
+    const parts = normalized.split(",");
+    if (parts.length > 1 && parts[parts.length - 1].length === 3) {
+      const parsed = Number(parts.join(""));
+      return negative ? -parsed : parsed;
+    }
+    const parsed = Number(normalized.replace(",", "."));
+    return negative ? -parsed : parsed;
   }
 
   if (hasDot) {
     const parts = normalized.split(".");
     if (parts.length > 1 && parts[parts.length - 1].length === 3) {
-      return Number(parts.join(""));
+      const parsed = Number(parts.join(""));
+      return negative ? -parsed : parsed;
     }
   }
 
-  return Number(normalized);
+  const parsed = Number(normalized);
+  return negative ? -parsed : parsed;
 }
 
 import crypto from "crypto";
@@ -95,6 +117,96 @@ function firstPresent(...values: any[]): string {
     if (cleaned) return cleaned;
   }
   return "";
+}
+
+const APP_TIMEZONE = process.env.APP_TIMEZONE || "America/Santiago";
+
+function getTimeZoneOffsetMs(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(parts.filter(part => part.type !== "literal").map(part => [part.type, Number(part.value)]));
+  const utcMillis = Date.UTC(values.year, values.month - 1, values.day, values.hour, values.minute, values.second);
+  return utcMillis - date.getTime();
+}
+
+function dateOnlyInTimeZoneToUtc(year: number, month: number, day: number, endOfDay = false, timeZone = APP_TIMEZONE): Date {
+  const hour = endOfDay ? 23 : 0;
+  const minute = endOfDay ? 59 : 0;
+  const second = endOfDay ? 59 : 0;
+  const millisecond = endOfDay ? 999 : 0;
+  const localAsUtc = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
+  let date = new Date(localAsUtc - getTimeZoneOffsetMs(new Date(localAsUtc), timeZone));
+  date = new Date(localAsUtc - getTimeZoneOffsetMs(date, timeZone));
+  return date;
+}
+
+function parseDateParam(value: any, endOfDay = false): Date {
+  const raw = cleanString(value);
+  if (!raw) {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: APP_TIMEZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(now);
+    const values = Object.fromEntries(parts.filter(part => part.type !== "literal").map(part => [part.type, Number(part.value)]));
+    return dateOnlyInTimeZoneToUtc(values.year, values.month, values.day, endOfDay);
+  }
+
+  // Match YYYY-MM-DD
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const [, year, month, day] = match;
+    return dateOnlyInTimeZoneToUtc(Number(year), Number(month), Number(day), endOfDay);
+  }
+
+  // Match DD-MM-YYYY or DD/MM/YYYY
+  const matchDDMM = raw.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (matchDDMM) {
+    const [, day, month, year] = matchDDMM;
+    return dateOnlyInTimeZoneToUtc(Number(year), Number(month), Number(day), endOfDay);
+  }
+
+  // Match DD-MM-YYYY HH:mm:ss or DD/MM/YYYY HH:mm:ss
+  const matchDDMMTime = raw.match(/^(\d{2})[-/](\d{2})[-/](\d{4})\s+(.+)$/);
+  if (matchDDMMTime) {
+    const [, day, month, year, time] = matchDDMMTime;
+    const date = new Date(`${year}-${month}-${day}T${time}`);
+    if (!isNaN(date.getTime())) {
+      if (endOfDay) date.setHours(23, 59, 59, 999);
+      return date;
+    }
+  }
+
+  const date = new Date(raw);
+  if (endOfDay) date.setHours(23, 59, 59, 999);
+  return date;
+}
+
+function makeSaleFallbackId(payload: {
+  conversationId?: string;
+  phone?: string;
+  amount?: any;
+  createdAt?: any;
+}) {
+  const stableParts = [
+    cleanString(payload.conversationId) || "no-conv",
+    normalizePhone(cleanString(payload.phone) || "no-phone"),
+    String(parseAmount(payload.amount) || "no-amount"),
+    cleanString(payload.createdAt) || new Date().toISOString().slice(0, 10),
+  ];
+
+  return `chatwoot-${stableParts.join("-")}`;
 }
 
 function extractLabels(body: any): string[] {
@@ -156,11 +268,14 @@ function normalizeN8nPayload(body: any) {
     attrs?.value,
   );
   const adId = firstPresent(findField(body, ["adId", "ad_id", "id_anuncio"]), attrs?.adId, attrs?.ad_id, body?.referral?.source_id);
+  const eventDate = firstPresent(findField(body, ["createdAt", "date", "fecha", "fechaVenta", "saleDate", "timestamp"]), attrs?.createdAt, attrs?.date, attrs?.fecha);
   const metaEventId = firstPresent(
     findField(body, ["metaEventId", "meta_event_id", "event_id"]),
     attrs?.metaEventId,
     attrs?.meta_event_id,
-    conversationId || phone ? `${isSale ? "purchase" : "lead"}-${conversationId || "no-conv"}-${normalizePhone(phone || "no-phone")}` : "",
+    isSale
+      ? makeSaleFallbackId({ conversationId, phone, amount, createdAt: eventDate }).replace(/^chatwoot-/, "purchase-")
+      : conversationId || phone ? `lead-${conversationId || "no-conv"}-${normalizePhone(phone || "no-phone")}` : "",
   );
 
   const payload: any = {
@@ -180,13 +295,19 @@ function normalizeN8nPayload(body: any) {
     adHeadline: firstPresent(findField(body, ["adHeadline", "ad_headline", "headline"]), attrs?.adHeadline, attrs?.ad_headline, body?.referral?.headline),
     adUrl: firstPresent(findField(body, ["adUrl", "ad_url"]), attrs?.adUrl, attrs?.ad_url, body?.referral?.source_url),
     metaEventId,
+    createdAt: eventDate,
     converted: firstPresent(findField(body, ["converted", "convertido"]), isSale ? "true" : ""),
     rawEvent: body,
   };
 
   if (isSale) {
     payload.amount = amount;
-    payload.externalId = firstPresent(findField(body, ["externalId", "pedido_num", "order_id", "id", "transaccion", "pedido", "orderId", "id_venta", "trans_id"]), attrs?.externalId, attrs?.external_id, conversationId ? `chatwoot-${conversationId}` : "");
+    payload.externalId = firstPresent(
+      findField(body, ["externalId", "pedido_num", "order_id", "transaccion", "pedido", "orderId", "id_venta", "trans_id"]),
+      attrs?.externalId,
+      attrs?.external_id,
+      conversationId || phone ? makeSaleFallbackId({ conversationId, phone, amount, createdAt: eventDate }) : ""
+    );
     payload.currency = firstPresent(findField(body, ["currency", "moneda", "divisa"]), attrs?.currency, "CLP");
     payload.paymentStatus = firstPresent(findField(body, ["paymentStatus", "pago_estado"]), attrs?.paymentStatus, "paid");
   }
@@ -304,6 +425,46 @@ async function startServer() {
       res.status(500).json({ error: e.message });
     }
   });
+
+  // POST /api/admin/reattribute-sales — re-procesa atribución y copia datos del lead al sale
+  app.post("/api/admin/reattribute-sales", async (_req: express.Request, res: express.Response) => {
+    try {
+      // Buscar ventas que tienen match pero les faltan campos del lead
+      const sales = await prisma.sale.findMany({
+        where: {
+          attributionStatus: { in: ["strong_match", "attributed"] },
+          adId: null  // les falta el adId del lead
+        },
+        take: 200
+      });
+      res.json({ message: `Re-attributing ${sales.length} sales in background` });
+      let updated = 0;
+      for (const sale of sales) {
+        await processAttribution(sale.id).catch(() => {});
+        updated++;
+      }
+      console.log(`[REATTRIBUTE] Updated ${updated} sales`);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/admin/sync-sheets — fuerza la sincronización manual
+  app.post("/api/admin/sync-sheets", async (req, res) => {
+    try {
+      const result = await syncGoogleSheets();
+      if (result.success && result.ids) {
+        for (const id of result.ids) {
+          await processAttribution(id);
+          notifyTelegram(id).catch(() => {});
+        }
+      }
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
 
   // POST /api/setup — Bootstrap: create the first Business + ApiKey (only if none exist)
   app.post("/api/setup", async (req, res) => {
@@ -547,7 +708,8 @@ async function startServer() {
       const conversationId = findField(body, ["conversationId", "idConversation", "id_conversacion", "id_chat", "conv_id"]);
       const country = findField(body, ["country", "pais", "nacion"]);
       const isConverted = findField(body, ["converted", "convertido"]);
-      const externalId = findField(body, ["externalId", "id", "transaccion", "pedido", "orderId", "id_venta", "trans_id"]);
+      const saleDate = findField(body, ["createdAt", "date", "fecha", "fechaVenta", "saleDate", "timestamp"]);
+      const externalId = findField(body, ["externalId", "pedido_num", "order_id", "transaccion", "pedido", "orderId", "id_venta", "trans_id"]);
       const currency = findField(body, ["currency", "moneda", "divisa"]) || "CLP";
       const whatsappId = findField(body, ["whatsappId", "waId", "inboxid"]);
       const paymentStatus = findField(body, ["paymentStatus", "status", "estado", "pago_estado"]) || "paid";
@@ -559,15 +721,22 @@ async function startServer() {
       const adId = findField(body, ["adId", "ad_id", "id_anuncio"]);
       const adName = findField(body, ["adName", "ad_name", "nombre_anuncio"]);
 
-      const parsedAmount = parseAmount(amount);
-      if (!phone || amount === undefined || !Number.isFinite(parsedAmount)) {
+      let parsedAmount = parseAmount(amount);
+      if ((!Number.isFinite(parsedAmount) || parsedAmount <= 0) && process.env.DEFAULT_SALE_AMOUNT) {
+        parsedAmount = parseAmount(process.env.DEFAULT_SALE_AMOUNT);
+      }
+      if (!phone || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
         return res.status(400).json({ error: "Phone and valid amount are required" });
       }
 
       const phoneNormalized = normalizePhone(String(phone));
+      const createdAt = saleDate ? parseDateParam(saleDate) : undefined;
+      const finalExternalId = externalId
+        ? String(externalId)
+        : makeSaleFallbackId({ conversationId: cleanString(conversationId), phone: String(phone), amount, createdAt: cleanString(saleDate) });
 
       // Separate known fields from metadata
-      const knownKeys = ["phone", "amount", "externalId", "currency", "whatsappId", "paymentStatus", "ctwaClid", "name", "nombre", "stage", "etapa", "country", "pais", "conversationId", "converted", "adUrl", "ad_url", "adHeadline", "ad_headline", "adId", "ad_id", "adName", "ad_name", "campaignId", "campaign_id", "campaignName", "campaign_name", "adsetId", "adset_id", "adsetName", "adset_name", "metaEventId", "meta_event_id", "metaStatus", "meta_status", "metaResponse", "meta_response", "metaError", "meta_error"];
+      const knownKeys = ["phone", "amount", "externalId", "currency", "whatsappId", "paymentStatus", "ctwaClid", "name", "nombre", "stage", "etapa", "country", "pais", "conversationId", "createdAt", "date", "fecha", "fechaVenta", "saleDate", "timestamp", "converted", "adUrl", "ad_url", "adHeadline", "ad_headline", "adId", "ad_id", "adName", "ad_name", "campaignId", "campaign_id", "campaignName", "campaign_name", "adsetId", "adset_id", "adsetName", "adset_name", "metaEventId", "meta_event_id", "metaStatus", "meta_status", "metaResponse", "meta_response", "metaError", "meta_error"];
       
       const adUrl = findField(body, ["adUrl", "ad_url"]);
       const adHeadline = findField(body, ["adHeadline", "ad_headline", "headline"]);
@@ -577,13 +746,13 @@ async function startServer() {
       const metaError = findField(body, ["metaError", "meta_error"]);
 
       // --- Deduplication ---
-      if (metaEventId || externalId) {
+      if (metaEventId || finalExternalId) {
         const existing = await prisma.sale.findFirst({
           where: {
             businessId,
             OR: [
               ...(metaEventId ? [{ metaEventId: String(metaEventId) }] : []),
-              ...(externalId ? [{ externalId: String(externalId) }] : [])
+              ...(finalExternalId ? [{ externalId: finalExternalId }] : [])
             ]
           }
         });
@@ -621,7 +790,7 @@ async function startServer() {
       const sale = await prisma.sale.create({
         data: {
           businessId,
-          externalId: externalId ? String(externalId) : null,
+          externalId: finalExternalId,
           amount: parsedAmount,
           currency: String(currency),
           phone: String(phone),
@@ -646,12 +815,16 @@ async function startServer() {
           adsetName: adsetName ? String(adsetName) : null,
           adId: adId ? String(adId) : null,
           adName: adName ? String(adName) : null,
+          createdAt,
           metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
         }
       });
 
       // Attribution Match Logic
       await processAttribution(sale.id);
+      
+      // Notificaciones Push/Telegram
+      notifyTelegram(sale.id).catch(err => console.error("[NOTIFY ERROR] Telegram trigger:", err));
 
       const updatedSale = await prisma.sale.findUnique({
         where: { id: sale.id },
@@ -758,18 +931,25 @@ async function startServer() {
 
       // Check if scalable
       const lead = await prisma.lead.findUnique({ where: { id: bestLeadId } });
-      const isScalable = (sale.paymentStatus === "paid" && sale.amount > 0 && (status === "strong_match" || status === "attributed") && (lead?.adId || lead?.campaignId)) ? true : false;
+      const isScalable = (sale.paymentStatus === "paid" && (status === "strong_match" || status === "attributed") && (lead?.adId || lead?.campaignId)) ? true : false;
 
-      // Copiar nombre del lead a la venta si la venta no tiene nombre
-      const nameUpdate: any = { attributionStatus: status, isScalable: isScalable };
-      if (!sale.customerName && lead?.customerName) {
-        nameUpdate.customerName = lead.customerName;
+      // Copiar TODOS los datos del lead a la venta para CAPI completo
+      const saleUpdate: any = { attributionStatus: status, isScalable };
+      if (lead) {
+        if (!sale.customerName && lead.customerName)   saleUpdate.customerName = lead.customerName;
+        if (!sale.ctwaClid     && lead.ctwaClid)       saleUpdate.ctwaClid     = lead.ctwaClid;
+        if (!sale.adId         && lead.adId)           saleUpdate.adId         = lead.adId;
+        if (!sale.adName       && lead.adName)         saleUpdate.adName       = lead.adName;
+        if (!sale.adUrl        && lead.adUrl)          saleUpdate.adUrl        = lead.adUrl;
+        if (!sale.adHeadline   && lead.adHeadline)     saleUpdate.adHeadline   = lead.adHeadline;
+        if (!sale.campaignId   && lead.campaignId)     saleUpdate.campaignId   = lead.campaignId;
+        if (!sale.campaignName && lead.campaignName)   saleUpdate.campaignName = lead.campaignName;
+        if (!sale.adsetId      && lead.adsetId)        saleUpdate.adsetId      = lead.adsetId;
+        if (!sale.adsetName    && lead.adsetName)      saleUpdate.adsetName    = lead.adsetName;
+        if (!sale.country      && lead.country)        saleUpdate.country      = lead.country;
       }
 
-      await prisma.sale.update({
-        where: { id: sale.id },
-        data: nameUpdate
-      });
+      await prisma.sale.update({ where: { id: sale.id }, data: saleUpdate });
 
       // --- AUTOMATIC CAPI TRANSMISSION ---
       if (isScalable) {
@@ -817,14 +997,8 @@ async function startServer() {
       const { from, to } = req.query;
       let where: any = {};
       
-      const startDate = from ? new Date(from as string) : new Date();
-      if (!from) startDate.setHours(0, 0, 0, 0);
-
-      const endDate = to ? new Date(to as string) : new Date();
-      if (!to) endDate.setHours(23, 59, 59, 999);
-      else {
-        endDate.setHours(23, 59, 59, 999);
-      }
+      const startDate = parseDateParam(from);
+      const endDate = parseDateParam(to, true);
 
       where.createdAt = { gte: startDate, lte: endDate };
       
@@ -961,10 +1135,8 @@ async function startServer() {
   app.get("/api/performance/ads", async (req, res) => {
     try {
       const { from, to } = req.query;
-      const startDate = from ? new Date(from as string) : new Date();
-      if (!from) startDate.setHours(0, 0, 0, 0);
-      const endDate = to ? new Date(to as string) : new Date();
-      endDate.setHours(23, 59, 59, 999);
+      const startDate = parseDateParam(from);
+      const endDate = parseDateParam(to, true);
 
       // 1. Obtener gasto por anuncio
       const performance = await prisma.adPerformance.findMany({
@@ -1244,18 +1416,33 @@ async function startServer() {
     if (!config) return;
 
     try {
+      // Obtener ctwaClid del sale (copiado del lead en processAttribution)
+      // o directamente del lead matcheado si aún no estaba en el sale
+      let ctwaClid = sale.ctwaClid;
+      if (!ctwaClid) {
+        const match = await prisma.attributionMatch.findFirst({
+          where: { saleId: sale.id },
+          include: { lead: { select: { ctwaClid: true } } }
+        });
+        ctwaClid = match?.lead?.ctwaClid || null;
+      }
+
+      const phoneHash = crypto.createHash('sha256').update(sale.phoneNormalized).digest('hex');
+      const userData: any = { ph: [phoneHash] };
+      if (ctwaClid) {
+        userData.ctwa_clid = ctwaClid;
+      }
+
       const payload = {
         data: [{
           event_name: "Purchase",
           event_time: Math.floor(sale.createdAt.getTime() / 1000),
           action_source: "chat",
           event_id: eventId,
-          user_data: {
-            ph: [crypto.createHash('sha256').update(sale.phoneNormalized).digest('hex')],
-          },
+          user_data: userData,
           custom_data: {
-            value: sale.amount,
-            currency: sale.currency,
+            value: sale.amount > 0 ? sale.amount : 1,
+            currency: sale.currency || "CLP",
           }
         }],
         test_event_code: config.testEventCode || undefined
@@ -1314,8 +1501,8 @@ async function startServer() {
       const { from, to, limit: lim } = req.query;
       const take = Math.min(parseInt(String(lim || "100")), 500);
       const where: any = {};
-      if (from) where.createdAt = { gte: new Date(from as string) };
-      if (to) where.createdAt = { ...where.createdAt, lte: new Date(new Date(to as string).setHours(23,59,59,999)) };
+      if (from) where.createdAt = { gte: parseDateParam(from) };
+      if (to) where.createdAt = { ...where.createdAt, lte: parseDateParam(to, true) };
 
       const matches = await prisma.attributionMatch.findMany({
         where,
@@ -1339,8 +1526,8 @@ async function startServer() {
       if (status) where.status = String(status);
       if (from || to) {
         where.createdAt = {};
-        if (from) where.createdAt.gte = new Date(from as string);
-        if (to) { const d = new Date(to as string); d.setHours(23,59,59,999); where.createdAt.lte = d; }
+        if (from) where.createdAt.gte = parseDateParam(from);
+        if (to) where.createdAt.lte = parseDateParam(to, true);
       }
 
       const events = await prisma.capiEvent.findMany({
@@ -1362,11 +1549,9 @@ async function startServer() {
       
       if (from || to) {
         where.createdAt = {};
-        if (from) where.createdAt.gte = new Date(from as string);
+        if (from) where.createdAt.gte = parseDateParam(from);
         if (to) {
-          const toDate = new Date(to as string);
-          toDate.setHours(23, 59, 59, 999);
-          where.createdAt.lte = toDate;
+          where.createdAt.lte = parseDateParam(to, true);
         }
       } else {
         const today = new Date();
@@ -1433,11 +1618,9 @@ async function startServer() {
       
       if (from || to) {
         where.createdAt = {};
-        if (from) where.createdAt.gte = new Date(from as string);
+        if (from) where.createdAt.gte = parseDateParam(from);
         if (to) {
-          const toDate = new Date(to as string);
-          toDate.setHours(23, 59, 59, 999);
-          where.createdAt.lte = toDate;
+          where.createdAt.lte = parseDateParam(to, true);
         }
       } else {
         const today = new Date();
@@ -1473,7 +1656,91 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    
+    // Iniciar sincronización automática cada 2 minutos
+    console.log("[SYNC] Programando sincronización automática cada 2 minutos");
+    setInterval(async () => {
+      try {
+        const result = await syncGoogleSheets();
+        if (result.success && result.ids) {
+          for (const id of result.ids) {
+            await processAttribution(id);
+            notifyTelegram(id).catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.error("[SYNC ERROR]", err);
+      }
+    }, 2 * 60 * 1000);
+
+    // Iniciar reintento automático de CAPI cada 5 minutos
+    console.log("[CAPI] Programando reintento automático cada 5 minutos");
+    setInterval(() => {
+      runCapiRetryJob().catch(err => console.error("[CAPI RETRY ERROR]", err));
+    }, 5 * 60 * 1000);
+
+    // Primera sincronización al arrancar
+    syncGoogleSheets().then(async (result) => {
+      if (result.success && result.ids) {
+        for (const id of result.ids) {
+          await processAttribution(id);
+          notifyTelegram(id).catch(() => {});
+        }
+      }
+    }).catch(err => console.error("[SYNC START ERROR]", err));
   });
+
+  async function runCapiRetryJob() {
+    const failedSales = await prisma.sale.findMany({
+      where: {
+        capiStatus: "failed",
+        isScalable: true,
+        intentosReintento: { lt: 5 }
+      },
+      take: 20
+    });
+
+    if (failedSales.length === 0) return;
+    console.log(`[CAPI RETRY] Intentando re-enviar ${failedSales.length} ventas...`);
+
+    for (const sale of failedSales) {
+      await prisma.sale.update({
+        where: { id: sale.id },
+        data: { intentosReintento: { increment: 1 } }
+      });
+      await sendToCapi(sale.id).catch(err => console.error(`[CAPI RETRY] Falló para ${sale.id}:`, err));
+    }
+  }
+
+  async function notifyTelegram(saleId: string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+
+    try {
+      const sale = await prisma.sale.findUnique({ where: { id: saleId } });
+      if (!sale) return;
+
+      const message = `🚀 *NUEVA VENTA DETECTADA*\n\n` +
+                      `👤 *Cliente:* ${sale.customerName || 'Desconocido'}\n` +
+                      `💰 *Monto:* $${new Intl.NumberFormat('es-CL').format(sale.amount)} ${sale.currency}\n` +
+                      `📱 *Teléfono:* ${sale.phone}\n` +
+                      `🏷️ *Campaña:* ${sale.campaignName || 'Orgánico'}\n` +
+                      `🔗 *Ad:* ${sale.adName || 'N/A'}\n` +
+                      `📡 *Status CAPI:* ${sale.capiStatus}\n\n` +
+                      `_Enviado desde CapiCenter Orbital_`;
+
+      await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'Markdown'
+      });
+      console.log(`[NOTIFY] Telegram enviado para venta ${saleId}`);
+    } catch (e: any) {
+      console.error("[NOTIFY ERROR] Telegram:", e.message);
+    }
+  }
 }
+
 
 startServer();
