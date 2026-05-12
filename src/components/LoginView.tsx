@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Orbit, Eye, EyeOff, Lock } from 'lucide-react';
+import { Eye, EyeOff, Lock } from 'lucide-react';
 import { motion } from 'motion/react';
+import logo from '../assets/images/wentix_logo.png';
 
 interface LoginViewProps {
   onLogin: (token: string) => void;
@@ -53,8 +54,8 @@ export function LoginView({ onLogin }: LoginViewProps) {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-900 border border-blue-500/20 mb-4">
-            <Orbit className="h-8 w-8 text-blue-400 animate-[spin_10s_linear_infinite]" />
+          <div className="inline-flex items-center justify-center h-20 w-56 bg-black/40 border border-blue-500/20 mb-5 px-6">
+            <img src={logo} alt="Wentix AI" className="max-h-12 max-w-full object-contain" />
           </div>
           <h1 className="text-4xl font-black italic tracking-tight text-white uppercase">
             CAPI <span className="text-blue-400">CENTER</span>

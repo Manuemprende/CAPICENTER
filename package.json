@@ -9,6 +9,7 @@
     "build": "vite build && prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "sync:sheets": "tsx prisma/import_sheets.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"

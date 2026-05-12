@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  capicenter:
+    build: .
+    image: capicenter:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.capicenter.rule=Host(`metacapi.wentixai.pro`)"
+        - "traefik.http.routers.capicenter.entrypoints=websecure"
+        - "traefik.http.routers.capicenter.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.capicenter.loadbalancer.server.port=3000"
+        - "traefik.docker.network=traefik-public"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://pingponghub:pingponghub123@217.216.94.71:5432/autorules"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
+      TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID}"
+    networks:
+      - traefik-public
+
+networks:
+  traefik-public:
+    external: true

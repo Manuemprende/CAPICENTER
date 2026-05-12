@@ -9,6 +9,7 @@ import { CapiEventsView } from './components/CapiEventsView';
 import { ErrorsView } from './components/ErrorsView';
 import { LoginView } from './components/LoginView';
 import { Menu } from 'lucide-react';
+import logoIcon from './assets/images/wentix_logo_icon.png';
 
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -90,9 +91,12 @@ export default function App() {
           <button onClick={() => setMobileOpen(true)} className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5">
             <Menu className="h-5 w-5" />
           </button>
-          <span className="text-sm font-black text-white uppercase tracking-widest">
-            WENTIX <span className="text-blue-400">AI</span>
-          </span>
+          <div className="flex items-center gap-2">
+            <img src={logoIcon} alt="Wentix AI" className="h-6 w-6 object-contain" />
+            <span className="text-sm font-black text-white uppercase tracking-widest">
+              WENTIX <span className="text-blue-400">AI</span>
+            </span>
+          </div>
           <div className="w-8" />
         </div>
 

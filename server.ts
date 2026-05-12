@@ -5,6 +5,7 @@ import axios from "axios";
 import { PrismaClient } from "@prisma/client";
 import cors from "cors";
 import { syncGoogleSheets } from "./src/lib/sync-sheets.ts";
+import { processAttribution, enrichLeadAdData } from "./src/lib/attribution.ts";
 
 
 
@@ -234,8 +235,8 @@ function normalizeN8nPayload(body: any) {
   const labels = extractLabels(body);
 
   const declaredType = cleanString(findField(body, ["eventType", "event", "type", "tipo", "entity", "resource"])).toLowerCase();
-  const saleLabels = new Set(["pagado", "pagada", "paid", "compra", "comprado", "convertido", "venta"]);
-  const isSale = declaredType.includes("sale") || declaredType.includes("venta") || labels.some((label) => saleLabels.has(label));
+  const saleLabels = ["pagado", "pagada", "paid", "compra", "comprado", "convertido", "venta"];
+  const isSale = declaredType.includes("sale") || declaredType.includes("venta") || labels.some((label) => saleLabels.some(s => label.includes(s)));
 
   const conversationId = firstPresent(
     body?.id,
@@ -268,6 +269,7 @@ function normalizeN8nPayload(body: any) {
     attrs?.value,
   );
   const adId = firstPresent(findField(body, ["adId", "ad_id", "id_anuncio"]), attrs?.adId, attrs?.ad_id, body?.referral?.source_id);
+  const ctwaClid = firstPresent(findField(body, ["ctwaClid", "ctwa_clid", "clid"]), attrs?.ctwaClid, attrs?.ctwa_clid, body?.referral?.ctwa_clid);
   const eventDate = firstPresent(findField(body, ["createdAt", "date", "fecha", "fechaVenta", "saleDate", "timestamp"]), attrs?.createdAt, attrs?.date, attrs?.fecha);
   const metaEventId = firstPresent(
     findField(body, ["metaEventId", "meta_event_id", "event_id"]),
@@ -320,37 +322,7 @@ const ADS_TOKENS: string[] = (() => {
   try { return JSON.parse(process.env.FACEBOOK_ADS_TOKENS || "[]"); } catch { return []; }
 })();
 
-async function enrichLeadAdData(leadId: string, adId: string) {
-  // Recolectar todos los tokens disponibles: MetaConfigs + ADS_TOKENS
-  const configs = await prisma.metaConfig.findMany({ where: { active: true } });
-  const tokens = [
-    ...configs.map(c => { try { return decrypt(c.accessToken); } catch { return ""; } }).filter(Boolean),
-    ...ADS_TOKENS,
-  ];
 
-  for (const token of tokens) {
-    try {
-      const { data } = await axios.get(
-        `https://graph.facebook.com/v17.0/${adId}?fields=name,campaign{name,id},adset{name,id}&access_token=${token}`,
-        { timeout: 8000 }
-      );
-      if (!data?.campaign?.name) continue;
-      await prisma.lead.update({
-        where: { id: leadId },
-        data: {
-          adName:       data.name           || null,
-          campaignId:   data.campaign?.id   || null,
-          campaignName: data.campaign?.name || null,
-          adsetId:      data.adset?.id      || null,
-          adsetName:    data.adset?.name    || null,
-        }
-      });
-      console.log(`[AD ENRICH] OK ${leadId}: ${data.campaign?.name} / ${data.name}`);
-      return;
-    } catch { continue; }
-  }
-  console.warn(`[AD ENRICH] Ningún token pudo enriquecer lead ${leadId} adId ${adId}`);
-}
 
 async function startServer() {
   const app = express();
@@ -455,10 +427,22 @@ async function startServer() {
   // POST /api/admin/sync-sheets — fuerza la sincronización manual
   app.post("/api/admin/sync-sheets", async (req, res) => {
     try {
-      const result = await syncGoogleSheets();
+      const result = await syncGoogleSheets() as any;
+      
+      // 1. Enrich new leads
+      if (result.success && result.leadIds) {
+        for (const leadId of result.leadIds) {
+          const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+          if (lead?.adId && !lead.campaignName) {
+            enrichLeadAdData(lead.id, lead.adId).catch(() => {});
+          }
+        }
+      }
+
+      // 2. Process attribution for new sales
       if (result.success && result.ids) {
         for (const id of result.ids) {
-          await processAttribution(id);
+          await processAttribution(id).catch(() => {});
           notifyTelegram(id).catch(() => {});
         }
       }
@@ -467,6 +451,7 @@ async function startServer() {
       res.status(500).json({ error: e.message });
     }
   });
+
 
 
   // POST /api/setup — Bootstrap: create the first Business + ApiKey (only if none exist)
@@ -725,11 +710,11 @@ async function startServer() {
       const adName = findField(body, ["adName", "ad_name", "nombre_anuncio"]);
 
       let parsedAmount = parseAmount(amount);
-      if ((!Number.isFinite(parsedAmount) || parsedAmount <= 0) && process.env.DEFAULT_SALE_AMOUNT) {
-        parsedAmount = parseAmount(process.env.DEFAULT_SALE_AMOUNT);
+      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+        parsedAmount = parseAmount(process.env.DEFAULT_SALE_AMOUNT || "3500");
       }
-      if (!phone || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-        return res.status(400).json({ error: "Phone and valid amount are required" });
+      if (!phone) {
+        return res.status(400).json({ error: "Phone is required" });
       }
 
       const phoneNormalized = normalizePhone(String(phone));
@@ -823,9 +808,16 @@ async function startServer() {
         }
       });
 
+
       // Attribution Match Logic
-      await processAttribution(sale.id);
+      const attrResult = await processAttribution(sale.id);
       
+      // If scalable, trigger CAPI
+      if (attrResult.isScalable) {
+        console.log(`[CAPI] Triggering automatic transmission for sale ${sale.id}`);
+        sendToCapi(sale.id).catch(err => console.error(`[CAPI ERROR] Auto transmission failed for ${sale.id}:`, err));
+      }
+
       // Notificaciones Push/Telegram
       notifyTelegram(sale.id).catch(err => console.error("[NOTIFY ERROR] Telegram trigger:", err));
 
@@ -843,132 +835,6 @@ async function startServer() {
       res.status(500).json({ error: error.message });
     }
   });
-
-  async function processAttribution(saleId: string) {
-    const sale = await prisma.sale.findUnique({ where: { id: saleId } });
-    if (!sale) return;
-
-    // Evitar duplicados: borrar matches previos antes de re-procesar
-    await prisma.attributionMatch.deleteMany({ where: { saleId } });
-
-    let bestLeadId: string | null = null;
-    let bestScore = 0;
-    let matchType = "";
-
-    // 1. Match by ctwaClid (Priority 1 - Score 100)
-    if (sale.ctwaClid) {
-       const clidLead = await prisma.lead.findFirst({
-         where: { 
-           businessId: sale.businessId,
-           ctwaClid: sale.ctwaClid
-         },
-         orderBy: { createdAt: 'desc' }
-       });
-
-       if (clidLead) {
-         bestLeadId = clidLead.id;
-         bestScore = 100;
-         matchType = "clid";
-       }
-    }
-
-    // 2. If no clid match, check multiple factors
-    if (bestScore < 100) {
-      const leads = await prisma.lead.findMany({
-        where: {
-          businessId: sale.businessId,
-          OR: [
-            { phoneNormalized: sale.phoneNormalized },
-            sale.whatsappId ? { whatsappId: sale.whatsappId } : {}
-          ]
-        },
-        orderBy: { createdAt: "desc" }
-      });
-
-      for (const lead of leads) {
-        let score = 0;
-        let type = "";
-
-        if (lead.phoneNormalized === sale.phoneNormalized) {
-          score = 85;
-          type = "phone";
-          
-          const diff = sale.createdAt.getTime() - lead.createdAt.getTime();
-          const hours = diff / (1000 * 60 * 60);
-          if (hours >= 0 && hours <= 48) {
-            score = 90; 
-            type = "phone_window";
-          }
-        }
-
-        if (sale.whatsappId && lead.whatsappId === sale.whatsappId) {
-          if (80 > score) {
-            score = 80;
-            type = "whatsapp_id";
-          }
-        }
-
-        if (score > bestScore) {
-          bestScore = score;
-          bestLeadId = lead.id;
-          matchType = type;
-        }
-      }
-    }
-
-    if (bestLeadId) {
-      await prisma.attributionMatch.create({
-        data: {
-          saleId: sale.id,
-          leadId: bestLeadId,
-          matchScore: bestScore,
-          matchType: matchType
-        }
-      });
-
-      // Determine attribution status
-      let status = "no_match";
-      if (bestScore >= 90) status = "strong_match";
-      else if (bestScore >= 70) status = "attributed";
-      else if (bestScore >= 40) status = "weak_match";
-
-      // Check if scalable
-      const lead = await prisma.lead.findUnique({ where: { id: bestLeadId } });
-      const isScalable = (sale.paymentStatus === "paid" && (status === "strong_match" || status === "attributed") && (lead?.adId || lead?.campaignId)) ? true : false;
-
-      // Copiar TODOS los datos del lead a la venta para CAPI completo
-      const saleUpdate: any = { attributionStatus: status, isScalable };
-      if (lead) {
-        if (!sale.customerName && lead.customerName)   saleUpdate.customerName = lead.customerName;
-        if (!sale.ctwaClid     && lead.ctwaClid)       saleUpdate.ctwaClid     = lead.ctwaClid;
-        if (!sale.adId         && lead.adId)           saleUpdate.adId         = lead.adId;
-        if (!sale.adName       && lead.adName)         saleUpdate.adName       = lead.adName;
-        if (!sale.adUrl        && lead.adUrl)          saleUpdate.adUrl        = lead.adUrl;
-        if (!sale.adHeadline   && lead.adHeadline)     saleUpdate.adHeadline   = lead.adHeadline;
-        if (!sale.campaignId   && lead.campaignId)     saleUpdate.campaignId   = lead.campaignId;
-        if (!sale.campaignName && lead.campaignName)   saleUpdate.campaignName = lead.campaignName;
-        if (!sale.adsetId      && lead.adsetId)        saleUpdate.adsetId      = lead.adsetId;
-        if (!sale.adsetName    && lead.adsetName)      saleUpdate.adsetName    = lead.adsetName;
-        if (!sale.country      && lead.country)        saleUpdate.country      = lead.country;
-      }
-
-      await prisma.sale.update({ where: { id: sale.id }, data: saleUpdate });
-
-      // --- AUTOMATIC CAPI TRANSMISSION ---
-      if (isScalable) {
-        console.log(`[CAPI] Triggering automatic transmission for sale ${sale.id}`);
-        // We call it without await to not block the main process if it takes time
-        sendToCapi(sale.id).catch(err => console.error(`[CAPI ERROR] Auto transmission failed for ${sale.id}:`, err));
-      }
-    } else {
-      await prisma.sale.update({
-        where: { id: sale.id },
-        data: {
-          attributionStatus: "manual_review"
-        }
-      });
-    }
-  }
 
   function reqBodyHasClid(sale: any) {
     return false; // Placeholder
@@ -1762,6 +1628,49 @@ async function startServer() {
     }
   }
 
+  async function checkScalingAlert(adId: string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    if (!token || !chatId || !adId) return;
+
+    try {
+      const now = new Date();
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      // 1. Contar ventas internas atribuidas a este Ad en las últimas 24h
+      const internalSalesCount = await prisma.sale.count({
+        where: {
+          adId,
+          paymentStatus: 'paid',
+          createdAt: { gte: twentyFourHoursAgo }
+        }
+      });
+
+      // 2. Solo alertar en hitos específicos (3, 5, 10, 15...) para no saturar
+      const milestones = [3, 5, 10, 15, 20, 25, 30, 40, 50];
+      if (!milestones.includes(internalSalesCount)) return;
+
+      // 3. Obtener nombre del anuncio (para el mensaje)
+      const adSample = await prisma.sale.findFirst({ where: { adId }, select: { adName: true, campaignName: true } });
+      
+      const message = `🔥 *OPORTUNIDAD DE ESCALAMIENTO* 🔥\n\n` +
+                      `📢 *Anuncio:* ${adSample?.adName || adId}\n` +
+                      `📈 *Campaña:* ${adSample?.campaignName || 'N/A'}\n\n` +
+                      `✅ Hemos detectado *${internalSalesCount} VENTAS* en las últimas 24 horas para este anuncio.\n\n` +
+                      `🚀 _Es un buen momento para considerar subir el presupuesto, incluso si Meta aún no muestra todas las conversiones._\n\n` +
+                      `[Ver en Dashboard](https://capicenter.wentixai.pro/performance)`;
+
+      await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'Markdown'
+      });
+      console.log(`[SCALING ALERT] Enviada para Ad ${adId} (${internalSalesCount} ventas)`);
+    } catch (e: any) {
+      console.error("[SCALING ALERT ERROR]:", e.message);
+    }
+  }
+
   async function notifyTelegram(saleId: string) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -1786,6 +1695,11 @@ async function startServer() {
         parse_mode: 'Markdown'
       });
       console.log(`[NOTIFY] Telegram enviado para venta ${saleId}`);
+      
+      // DISPARAR ALERTA DE ESCALAMIENTO
+      if (sale.adId) {
+        checkScalingAlert(sale.adId).catch(() => {});
+      }
     } catch (e: any) {
       console.error("[NOTIFY ERROR] Telegram:", e.message);
     }

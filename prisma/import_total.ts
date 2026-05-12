@@ -18,21 +18,54 @@ function encrypt(text: string) {
 
 const normalizePhone = (p: string) => p ? p.replace(/\D/g, "") : "";
 
-// Simple CSV parser to handle quotes and commas
 function parseCSVRow(line: string) {
-  const result = [];
+  const result: string[] = [];
   let current = '';
   let inQuotes = false;
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
-    if (char === '"') inQuotes = !inQuotes;
+    const next = line[i + 1];
+    if (char === '"' && inQuotes && next === '"') {
+      current += '"';
+      i++;
+    } else if (char === '"') inQuotes = !inQuotes;
     else if (char === ',' && !inQuotes) {
-      result.push(current);
+      result.push(current.trim());
       current = '';
     } else current += char;
   }
-  result.push(current);
+  result.push(current.trim());
   return result;
+}
+
+function parseAmount(value: any) {
+  let normalized = String(value ?? "").trim().replace(/[^\d,.-]/g, "");
+  if (!normalized) return NaN;
+  const negative = normalized.startsWith("-");
+  normalized = normalized.replace(/-/g, "");
+  const hasComma = normalized.includes(",");
+  const hasDot = normalized.includes(".");
+
+  let parsed: number;
+  if (hasComma && hasDot) {
+    const decimalSeparator = normalized.lastIndexOf(",") > normalized.lastIndexOf(".") ? "," : ".";
+    const thousandsSeparator = decimalSeparator === "," ? "." : ",";
+    parsed = Number(normalized.replace(new RegExp(`\\${thousandsSeparator}`, "g"), "").replace(decimalSeparator, "."));
+  } else if (hasComma) {
+    const parts = normalized.split(",");
+    parsed = parts.length > 1 && parts[parts.length - 1].length === 3
+      ? Number(parts.join(""))
+      : Number(normalized.replace(",", "."));
+  } else if (hasDot) {
+    const parts = normalized.split(".");
+    parsed = parts.length > 1 && parts[parts.length - 1].length === 3
+      ? Number(parts.join(""))
+      : Number(normalized);
+  } else {
+    parsed = Number(normalized);
+  }
+
+  return negative ? -parsed : parsed;
 }
 
 async function importEverything() {
@@ -95,17 +128,36 @@ async function importEverything() {
       if (!lines[i].trim()) continue;
       const row = parseCSVRow(lines[i]);
       const [fecha, nombre, telefono, montoStr, etapa, idConv, pais, convertido] = row;
-      const monto = parseFloat(montoStr);
-      if (isNaN(monto) || !telefono) continue;
+      const monto = parseAmount(montoStr);
+      const phoneNormalized = normalizePhone(telefono);
+      if (!Number.isFinite(monto) || monto <= 0 || !phoneNormalized) continue;
       const dateVal = new Date(fecha);
       const createdAt = isNaN(dateVal.getTime()) ? new Date() : dateVal;
-      await prisma.sale.create({
-        data: {
+      const externalId = `sheet-${src.gid}-${i}-${phoneNormalized}-${monto}`;
+      await prisma.sale.upsert({
+        where: { businessId_externalId: { businessId: business.id, externalId } },
+        update: {
+          createdAt,
+          customerName: nombre?.trim(),
+          phone: telefono?.trim(),
+          phoneNormalized,
+          amount: monto,
+          paymentStatus: 'paid',
+          stage: etapa?.trim(),
+          conversationId: idConv?.trim(),
+          country: pais?.trim(),
+          isConverted: convertido?.trim()
+        },
+        create: {
+          externalId,
+          paymentStatus: 'paid',
+          currency: 'CLP',
+          metadata: JSON.stringify({ source: src.name, row: i }),
           businessId: business.id,
           createdAt,
           customerName: nombre?.trim(),
           phone: telefono?.trim(),
-          phoneNormalized: normalizePhone(telefono),
+          phoneNormalized,
           amount: monto,
           stage: etapa?.trim(),
           conversationId: idConv?.trim(),
@@ -150,7 +202,7 @@ async function importEverything() {
             adName: headline?.trim(),
             adUrl: adUrl?.trim(),
             isConverted: converted?.trim(),
-            metaEventId: metaEvId?.trim(),
+            metaEventId: metaEvId?.trim() || null,
             metaStatus: metaStat?.trim(),
             metaResponse: metaResp?.trim(),
             metaError: metaErr?.trim(),

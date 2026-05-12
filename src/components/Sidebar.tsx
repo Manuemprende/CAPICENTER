@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Banknote, Upload, GitMerge, Zap, AlertTriangle, SlidersHorizontal, LogOut, Orbit } from 'lucide-react';
-import logo from '../assets/images/wentix_logo_icon.png';
+import { LayoutDashboard, MessageSquare, Banknote, Upload, GitMerge, Zap, AlertTriangle, SlidersHorizontal, LogOut } from 'lucide-react';
+import logo from '../assets/images/wentix_logo.png';
+import logoIcon from '../assets/images/wentix_logo_icon.png';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 
 interface SidebarProps {
   currentView: string;
@@ -35,27 +36,24 @@ export function Sidebar({ currentView, onViewChange, onLogout }: SidebarProps) {
       <div className="absolute -left-20 top-0 w-40 h-40 bg-blue-600/10 blur-[100px] pointer-events-none" />
       
       {/* Header / Clickable Logo Trigger */}
-      <div className={cn("p-6 flex items-center relative transition-all duration-300", isCollapsed ? "px-0 pb-4 justify-center" : "gap-3")}>
+      <div className={cn("p-5 flex items-center relative transition-all duration-300", isCollapsed ? "px-0 pb-4 justify-center" : "gap-3")}>
         <div 
-          className="relative group shrink-0 cursor-pointer transition-transform active:scale-90"
+          className={cn("relative group shrink-0 cursor-pointer transition-transform active:scale-90", !isCollapsed && "w-full")}
           onClick={() => setIsCollapsed(!isCollapsed)}
           title={isCollapsed ? "Expandir Menú" : "Contraer Menú"}
         >
-          <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-blue-400 rounded-2xl blur opacity-20 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-          <div className="relative w-10 h-10 bg-black rounded-xl flex items-center justify-center overflow-hidden border border-white/10 group-hover:border-blue-400/50 transition-colors">
-            <img src={logo} className="h-7 w-7 object-contain" alt="Wentix Logo" />
+          <div className="absolute -inset-1 bg-blue-500/15 blur-xl opacity-60 group-hover:opacity-90 transition duration-300"></div>
+          <div className={cn(
+            "relative bg-black/50 flex items-center overflow-hidden border border-white/10 group-hover:border-blue-400/50 transition-colors",
+            isCollapsed ? "w-10 h-10 justify-center rounded-xl" : "h-16 w-full justify-start rounded-lg px-4"
+          )}>
+            <img
+              src={isCollapsed ? logoIcon : logo}
+              className={cn("object-contain", isCollapsed ? "h-7 w-7" : "h-10 max-w-[150px]")}
+              alt="Wentix AI"
+            />
           </div>
         </div>
-        {!isCollapsed && (
-          <motion.div 
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex flex-col overflow-hidden"
-          >
-            <h1 className="font-cyber font-black text-lg tracking-tighter leading-none text-white whitespace-nowrap italic uppercase">WENTIX <span className="text-blue-400 not-italic">AI</span></h1>
-            <span className="text-[8px] text-blue-400/60 uppercase tracking-[0.4em] font-black mt-1 opacity-80 whitespace-nowrap">Orbital Intelligence</span>
-          </motion.div>
-        )}
       </div>
 
       {/* Navigation */}
