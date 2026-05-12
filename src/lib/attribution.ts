@@ -30,7 +30,7 @@ export async function enrichLeadAdData(leadId: string, adId: string) {
         );
         if (!data?.campaign?.name) continue;
 
-        await prisma.lead.update({
+        const updatedLead = await prisma.lead.update({
           where: { id: leadId },
           data: {
             adName: data.name,
@@ -40,7 +40,16 @@ export async function enrichLeadAdData(leadId: string, adId: string) {
             adsetName: data.adset?.name,
           },
         });
-        console.log(`[ENRICH] Lead ${leadId} enriched with campaign: ${data.campaign?.name}`);
+        
+        // Update all sales that belong to this lead/phone number
+        const pendingSales = await prisma.sale.findMany({
+          where: { businessId: updatedLead.businessId, phoneNormalized: updatedLead.phoneNormalized }
+        });
+        for (const s of pendingSales) {
+          await processAttribution(s.id).catch(() => {});
+        }
+        
+        console.log(`[ENRICH] Lead ${leadId} enriched and sales updated with campaign: ${data.campaign?.name}`);
         return;
       } catch { continue; }
     }

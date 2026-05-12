@@ -578,19 +578,24 @@ async function startServer() {
       const body = req.body;
       const businessId = (req as any).businessId;
 
-      const phone = findField(body, ["phone", "telefono", "whatsapp", "celular", "contacto", "mobile", "numero", "waId"]);
-      const customerName = findField(body, ["name", "nombre", "customer", "cliente", "user_name"]);
-      const stage = findField(body, ["stage", "etapa", "status", "estado"]);
-      const conversationId = findField(body, ["conversationId", "idConversation", "id_conversacion", "id_chat", "conv_id"]);
-      const country = findField(body, ["country", "pais", "nacion"]);
-      const whatsappId = findField(body, ["whatsappId", "waId", "wa_id", "inboxid"]);
-      const ctwaClid = findField(body, ["ctwaClid", "clid", "fbclid", "clickId", "external_id", "ctwa_clid"]);
-      const campaignId = findField(body, ["campaignId", "campId", "id_campana", "campaign_id"]);
-      const campaignName = findField(body, ["campaignName", "campName", "nombre_campana", "campaign_name"]);
-      const adsetId = findField(body, ["adsetId", "adset_id", "id_conjunto"]);
-      const adsetName = findField(body, ["adsetName", "adset_name", "nombre_conjunto"]);
-      const adId = findField(body, ["adId", "ad_id", "id_anuncio"]);
-      const adName = findField(body, ["adName", "ad_name", "nombre_anuncio"]);
+      const attrs = { ...(body?.custom_attributes || {}), ...(body?.meta?.sender?.custom_attributes || {}) };
+      const phone = firstPresent(findField(body, ["phone", "telefono", "whatsapp", "celular", "contacto", "mobile", "numero", "waId"]), attrs?.phone, attrs?.telefono);
+      const customerName = firstPresent(findField(body, ["name", "nombre", "customer", "cliente", "user_name"]), body?.meta?.sender?.name, attrs?.name);
+      const stage = firstPresent(findField(body, ["stage", "etapa", "status", "estado"]), attrs?.stage);
+      const conversationId = firstPresent(findField(body, ["conversationId", "idConversation", "id_conversacion", "id_chat", "conv_id"]), body?.conversation?.id);
+      const country = firstPresent(findField(body, ["country", "pais", "nacion"]), attrs?.country, attrs?.pais, "CL");
+      const whatsappId = firstPresent(findField(body, ["whatsappId", "waId", "wa_id", "inboxid"]), attrs?.whatsappId, attrs?.wa_id);
+      
+      const ctwaClid = firstPresent(
+        findField(body, ["ctwaClid", "clid", "fbclid", "clickId", "external_id", "ctwa_clid"]), 
+        attrs?.ctwaClid, attrs?.ctwa_clid, body?.referral?.ctwa_clid
+      );
+      const campaignId = firstPresent(findField(body, ["campaignId", "campId", "id_campana", "campaign_id"]), attrs?.campaignId, attrs?.campaign_id);
+      const campaignName = firstPresent(findField(body, ["campaignName", "campName", "nombre_campana", "campaign_name"]), attrs?.campaignName, attrs?.campaign_name);
+      const adsetId = firstPresent(findField(body, ["adsetId", "adset_id", "id_conjunto"]), attrs?.adsetId, attrs?.adset_id);
+      const adsetName = firstPresent(findField(body, ["adsetName", "adset_name", "nombre_conjunto"]), attrs?.adsetName, attrs?.adset_name);
+      const adId = firstPresent(findField(body, ["adId", "ad_id", "id_anuncio"]), attrs?.adId, attrs?.ad_id, body?.referral?.source_id);
+      const adName = firstPresent(findField(body, ["adName", "ad_name", "nombre_anuncio"]), attrs?.adName, attrs?.ad_name);
 
       if (!phone) return res.status(400).json({ error: "Phone is required" });
 
@@ -672,6 +677,17 @@ async function startServer() {
         }
       });
 
+      // --- Retroactive Attribution ---
+      // If this lead has attribution data, find any "Organic" sales for this phone and attribute them now
+      if (lead.adId || lead.ctwaClid) {
+        const pendingSales = await prisma.sale.findMany({
+          where: { businessId, phoneNormalized: lead.phoneNormalized }
+        });
+        for (const sale of pendingSales) {
+          await processAttribution(sale.id).catch(() => {});
+        }
+      }
+
       // Enriquecer con datos de campaña desde Meta API en background
       if (lead.adId && !lead.campaignName) {
         enrichLeadAdData(lead.id, lead.adId).catch(() => {});
@@ -689,25 +705,37 @@ async function startServer() {
       const body = req.body;
       const businessId = (req as any).businessId;
 
-      const phone = findField(body, ["phone", "telefono", "whatsapp", "celular", "contacto", "mobile", "numero", "waId"]);
-      const amount = findField(body, ["amount", "value", "monto", "valor", "total", "precio", "monto_total", "venta"]);
-      const customerName = findField(body, ["name", "nombre", "customer", "cliente", "user_name"]);
-      const stage = findField(body, ["stage", "etapa", "status", "estado"]);
-      const conversationId = findField(body, ["conversationId", "idConversation", "id_conversacion", "id_chat", "conv_id"]);
-      const country = findField(body, ["country", "pais", "nacion"]);
-      const isConverted = findField(body, ["converted", "convertido"]);
+      const attrs = { ...(body?.custom_attributes || {}), ...(body?.meta?.sender?.custom_attributes || {}), ...(body?.conversation?.custom_attributes || {}) };
+      const phone = firstPresent(findField(body, ["phone", "telefono", "whatsapp", "celular", "contacto", "mobile", "numero", "waId"]), attrs?.phone, attrs?.telefono);
+      const amount = firstPresent(findField(body, ["amount", "value", "monto", "valor", "total", "precio", "monto_total", "venta"]), attrs?.amount, attrs?.monto, attrs?.value);
+      const customerName = firstPresent(findField(body, ["name", "nombre", "customer", "cliente", "user_name"]), body?.meta?.sender?.name, attrs?.name);
+      const stage = firstPresent(findField(body, ["stage", "etapa", "status", "estado"]), attrs?.stage);
+      const conversationId = firstPresent(findField(body, ["conversationId", "idConversation", "id_conversacion", "id_chat", "conv_id"]), body?.conversation?.id);
+      const country = firstPresent(findField(body, ["country", "pais", "nacion"]), attrs?.country, attrs?.pais, "CL");
+      
+      const externalId = firstPresent(findField(body, ["externalId", "pedido_num", "order_id", "transaccion", "pedido", "orderId", "id_venta", "trans_id"]), attrs?.externalId, attrs?.pedido_num);
+      const currency = firstPresent(findField(body, ["currency", "moneda", "divisa"]), attrs?.currency, "CLP");
+      const whatsappId = firstPresent(findField(body, ["whatsappId", "waId", "wa_id", "inboxid"]), attrs?.whatsappId, attrs?.wa_id);
+      const paymentStatus = firstPresent(findField(body, ["paymentStatus", "status", "estado", "pago_estado"]), attrs?.paymentStatus, "paid");
+      
+      const ctwaClid = firstPresent(
+        findField(body, ["ctwaClid", "clid", "fbclid", "clickId", "ctwa_clid"]), 
+        attrs?.ctwaClid, attrs?.ctwa_clid, body?.referral?.ctwa_clid
+      );
+      const campaignId = firstPresent(findField(body, ["campaignId", "campId", "id_campana", "campaign_id"]), attrs?.campaignId, attrs?.campaign_id);
+      const campaignName = firstPresent(findField(body, ["campaignName", "campName", "nombre_campana", "campaign_name"]), attrs?.campaignName, attrs?.campaign_name);
+      const adsetId = firstPresent(findField(body, ["adsetId", "adset_id", "id_conjunto"]), attrs?.adsetId, attrs?.adset_id);
+      const adsetName = firstPresent(findField(body, ["adsetName", "adset_name", "nombre_conjunto"]), attrs?.adsetName, attrs?.adset_name);
+      const adId = firstPresent(findField(body, ["adId", "ad_id", "id_anuncio"]), attrs?.adId, attrs?.ad_id, body?.referral?.source_id);
+      const adName = firstPresent(findField(body, ["adName", "ad_name", "nombre_anuncio"]), attrs?.adName, attrs?.ad_name);
+      
+      const adUrl = firstPresent(findField(body, ["adUrl", "ad_url"]), attrs?.adUrl, body?.referral?.source_url);
+      const adHeadline = firstPresent(findField(body, ["adHeadline", "ad_headline", "headline"]), attrs?.adHeadline, body?.referral?.headline);
+      const metaEventId = findField(body, ["metaEventId", "meta_event_id", "event_id"]);
+      const metaStatus = findField(body, ["metaStatus", "meta_status"]);
+      const metaResponse = findField(body, ["metaResponse", "meta_response"]);
+      const metaError = findField(body, ["metaError", "meta_error"]);
       const saleDate = findField(body, ["createdAt", "date", "fecha", "fechaVenta", "saleDate", "timestamp"]);
-      const externalId = findField(body, ["externalId", "pedido_num", "order_id", "transaccion", "pedido", "orderId", "id_venta", "trans_id"]);
-      const currency = findField(body, ["currency", "moneda", "divisa"]) || "CLP";
-      const whatsappId = findField(body, ["whatsappId", "waId", "inboxid"]);
-      const paymentStatus = findField(body, ["paymentStatus", "status", "estado", "pago_estado"]) || "paid";
-      const ctwaClid = findField(body, ["ctwaClid", "clid", "fbclid", "clickId"]);
-      const campaignId = findField(body, ["campaignId", "campId", "id_campana", "campaign_id"]);
-      const campaignName = findField(body, ["campaignName", "campName", "nombre_campana", "campaign_name"]);
-      const adsetId = findField(body, ["adsetId", "adset_id", "id_conjunto"]);
-      const adsetName = findField(body, ["adsetName", "adset_name", "nombre_conjunto"]);
-      const adId = findField(body, ["adId", "ad_id", "id_anuncio"]);
-      const adName = findField(body, ["adName", "ad_name", "nombre_anuncio"]);
 
       let parsedAmount = parseAmount(amount);
       if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -725,13 +753,6 @@ async function startServer() {
 
       // Separate known fields from metadata
       const knownKeys = ["phone", "amount", "externalId", "currency", "whatsappId", "paymentStatus", "ctwaClid", "name", "nombre", "stage", "etapa", "country", "pais", "conversationId", "createdAt", "date", "fecha", "fechaVenta", "saleDate", "timestamp", "converted", "adUrl", "ad_url", "adHeadline", "ad_headline", "adId", "ad_id", "adName", "ad_name", "campaignId", "campaign_id", "campaignName", "campaign_name", "adsetId", "adset_id", "adsetName", "adset_name", "metaEventId", "meta_event_id", "metaStatus", "meta_status", "metaResponse", "meta_response", "metaError", "meta_error"];
-      
-      const adUrl = findField(body, ["adUrl", "ad_url"]);
-      const adHeadline = findField(body, ["adHeadline", "ad_headline", "headline"]);
-      const metaEventId = findField(body, ["metaEventId", "meta_event_id", "event_id"]);
-      const metaStatus = findField(body, ["metaStatus", "meta_status"]);
-      const metaResponse = findField(body, ["metaResponse", "meta_response"]);
-      const metaError = findField(body, ["metaError", "meta_error"]);
 
       // --- Deduplication ---
       if (metaEventId || finalExternalId) {
