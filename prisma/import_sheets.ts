@@ -126,22 +126,30 @@ async function upsertSheetLead(businessId: string, source: { gid: string; name: 
     }
 
     if (existing) {
-      // Si el existente es "orgánico" (no tiene adId) y el nuevo tiene adId, actualizamos
       const updated = await prisma.lead.update({ 
         where: { id: existing.id }, 
         data: {
           ...data,
-          // Preservar datos si el nuevo viene vacío pero el viejo tenía algo
           customerName: data.customerName || existing.customerName,
           adId: data.adId || existing.adId,
           ctwaClid: data.ctwaClid || existing.ctwaClid,
         } 
       });
+
+      if (updated.ctwaClid || updated.adId) {
+        const pendingSales = await prisma.sale.findMany({ where: { businessId, phoneNormalized } });
+        for (const s of pendingSales) await processAttribution(s.id).catch(() => {});
+      }
       return updated.id;
     }
 
     const metaEventId = data.ctwaClid ? `sheet-lead-${data.ctwaClid}` : `sheet-lead-${phoneNormalized}-${createdAt.getTime()}`;
     const created = await prisma.lead.create({ data: { businessId, metaEventId, ...data } });
+
+    if (created.ctwaClid || created.adId) {
+      const pendingSales = await prisma.sale.findMany({ where: { businessId, phoneNormalized } });
+      for (const s of pendingSales) await processAttribution(s.id).catch(() => {});
+    }
     return created.id;
   } catch (err: any) {
     console.error(`[SYNC LEAD ERROR] Row ${rowNumber}:`, err.message);

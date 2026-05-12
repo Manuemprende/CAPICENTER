@@ -137,6 +137,19 @@ async function upsertSheetLead(businessId: string, source: { gid: string; name: 
           ctwaClid: data.ctwaClid || existing.ctwaClid,
         } 
       });
+      
+      // CRITICAL: Re-evaluate any sales that belong to this phone number
+      // Because if a Sale arrived BEFORE this Lead sync, it was left as "Organic"
+      if (updated.ctwaClid || updated.adId) {
+        const pendingSales = await prisma.sale.findMany({
+          where: { businessId, phoneNormalized }
+        });
+        for (const s of pendingSales) {
+          // Re-process attribution to inject the new adId/campaignName into the sale
+          await processAttribution(s.id).catch(() => {});
+        }
+      }
+      
       return updated.id;
     }
 
