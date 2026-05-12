@@ -120,7 +120,7 @@ model Sale {
 
 model AttributionMatch {
   id         String   @id @default(cuid())
-  saleId     String
+  saleId     String   @unique
   leadId     String
   matchScore Int
   matchType  String

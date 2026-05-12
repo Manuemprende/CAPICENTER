@@ -151,20 +151,29 @@ export async function processAttribution(saleId: string) {
         }
       });
 
-      await prisma.attributionMatch.upsert({
-        where: { saleId: sale.id },
-        create: {
-          saleId: sale.id,
-          leadId: lead.id,
-          matchScore: bestScore,
-          matchType: matchType
-        },
-        update: {
-          leadId: lead.id,
-          matchScore: bestScore,
-          matchType: matchType
-        }
+      const existingMatch = await prisma.attributionMatch.findFirst({
+        where: { saleId: sale.id }
       });
+
+      if (existingMatch) {
+        await prisma.attributionMatch.update({
+          where: { id: existingMatch.id },
+          data: {
+            leadId: lead.id,
+            matchScore: bestScore,
+            matchType: matchType
+          }
+        });
+      } else {
+        await prisma.attributionMatch.create({
+          data: {
+            saleId: sale.id,
+            leadId: lead.id,
+            matchScore: bestScore,
+            matchType: matchType
+          }
+        });
+      }
 
       console.log(`[ATTRIBUTION OK] Sale ${sale.id} matched with Lead ${lead.id} (Score: ${bestScore}, Scalable: ${isScalable})`);
       return { success: true, isScalable, leadId: lead.id };
