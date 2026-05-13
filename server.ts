@@ -229,8 +229,8 @@ function extractLabels(body: any): string[] {
 
 function normalizeN8nPayload(body: any) {
   const contact = body?.meta?.sender || body?.conversation?.contact || body?.contact || body?.sender || {};
-  const conversationAttrs = body?.custom_attributes || body?.conversation?.custom_attributes || {};
-  const contactAttrs = contact?.custom_attributes || body?.meta?.sender?.custom_attributes || {};
+  const conversationAttrs = { ...(body?.custom_attributes || {}), ...(body?.conversation?.custom_attributes || {}), ...(body?.conversation?.additional_attributes || {}), ...(body?.additional_attributes || {}) };
+  const contactAttrs = { ...(contact?.custom_attributes || {}), ...(body?.meta?.sender?.custom_attributes || {}) };
   const attrs = { ...contactAttrs, ...conversationAttrs };
   const labels = extractLabels(body);
 
@@ -550,6 +550,11 @@ async function startServer() {
   // existing typed webhook handlers so dedupe, attribution and CAPI stay aligned.
   app.post("/api/webhooks/n8n", validateApiKey, async (req, res) => {
     try {
+      // Debug Capture
+      await prisma.debugWebhook.create({
+        data: { source: "n8n", payload: JSON.stringify(req.body) }
+      }).catch(() => {});
+
       const normalized = normalizeN8nPayload(req.body);
       const apiKey = String(req.headers["x-api-key"]);
       const targetUrl = `http://127.0.0.1:${PORT}/api/webhooks/${normalized.kind}`;
@@ -586,10 +591,11 @@ async function startServer() {
       // Robust attribute merging from all possible Chatwoot/n8n locations
       const attrs = { 
         ...(body?.custom_attributes || {}), 
+        ...(body?.additional_attributes || {}),
         ...(body?.meta?.sender?.custom_attributes || {}),
         ...(body?.conversation?.custom_attributes || {}),
+        ...(body?.conversation?.additional_attributes || {}),
         ...(body?.contact?.custom_attributes || {}),
-        ...(body?.meta?.sender?.custom_attributes || {})
       };
 
       const phone = firstPresent(
@@ -636,21 +642,23 @@ async function startServer() {
         body?.referral?.campaign_name
       );
 
+      const campaignId = firstPresent(findField(body, ["campaignId", "campaign_id", "id_campana"]), attrs?.campaignId, attrs?.campaign_id);
+      const adsetId = firstPresent(findField(body, ["adsetId", "adset_id", "id_conjunto"]), attrs?.adsetId, attrs?.adset_id);
+      const adsetName = firstPresent(findField(body, ["adsetName", "adset_name", "nombre_conjunto"]), attrs?.adsetName, attrs?.adset_name);
+      const adName = firstPresent(findField(body, ["adName", "ad_name", "nombre_anuncio"]), attrs?.adName, attrs?.ad_name);
       const adUrl = firstPresent(findField(body, ["adUrl", "ad_url"]), attrs?.adUrl, body?.referral?.source_url);
       const adHeadline = firstPresent(findField(body, ["adHeadline", "ad_headline", "headline"]), attrs?.adHeadline, body?.referral?.headline);
+      const isConverted = findField(body, ["converted", "convertido"]);
 
       if (!phone) return res.status(400).json({ error: "Phone is required" });
 
       // Separate known fields from metadata
       const knownKeys = ["phone", "whatsappId", "ctwaClid", "campaignId", "campaignName", "adsetId", "adsetName", "adId", "adName", "adHeadline", "name", "nombre", "stage", "etapa", "country", "pais", "conversationId", "adUrl", "ad_url", "metaEventId", "meta_event_id", "metaStatus", "meta_status", "metaResponse", "meta_response", "metaError", "meta_error", "converted"];
       
-      const adUrl = findField(body, ["adUrl", "ad_url"]);
-      const adHeadline = findField(body, ["adHeadline", "ad_headline", "headline"]);
       const metaEventId = findField(body, ["metaEventId", "meta_event_id", "event_id"]);
       const metaStatus = findField(body, ["metaStatus", "meta_status"]);
       const metaResponse = findField(body, ["metaResponse", "meta_response"]);
       const metaError = findField(body, ["metaError", "meta_error"]);
-      const isConverted = findField(body, ["converted", "convertido"]);
 
       const phoneNormalized = normalizePhone(String(phone));
 
@@ -755,8 +763,10 @@ async function startServer() {
       // Robust attribute merging from all possible Chatwoot/n8n locations
       const attrs = { 
         ...(body?.custom_attributes || {}), 
+        ...(body?.additional_attributes || {}),
         ...(body?.meta?.sender?.custom_attributes || {}), 
         ...(body?.conversation?.custom_attributes || {}),
+        ...(body?.conversation?.additional_attributes || {}),
         ...(body?.contact?.custom_attributes || {})
       };
 
@@ -811,6 +821,11 @@ async function startServer() {
 
       const adUrl = firstPresent(findField(body, ["adUrl", "ad_url"]), attrs?.adUrl, body?.referral?.source_url);
       const adHeadline = firstPresent(findField(body, ["adHeadline", "ad_headline", "headline"]), attrs?.adHeadline, body?.referral?.headline);
+      const campaignId = firstPresent(findField(body, ["campaignId", "campaign_id", "id_campana"]), attrs?.campaignId, attrs?.campaign_id);
+      const adsetId = firstPresent(findField(body, ["adsetId", "adset_id", "id_conjunto"]), attrs?.adsetId, attrs?.adset_id);
+      const adsetName = firstPresent(findField(body, ["adsetName", "adset_name", "nombre_conjunto"]), attrs?.adsetName, attrs?.adset_name);
+      const adName = firstPresent(findField(body, ["adName", "ad_name", "nombre_anuncio"]), attrs?.adName, attrs?.ad_name);
+      const isConverted = findField(body, ["converted", "convertido"]);
       const metaEventId = findField(body, ["metaEventId", "meta_event_id", "event_id"]);
       const metaStatus = findField(body, ["metaStatus", "meta_status"]);
       const metaResponse = findField(body, ["metaResponse", "meta_response"]);

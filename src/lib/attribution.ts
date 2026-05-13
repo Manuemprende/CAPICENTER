@@ -80,6 +80,19 @@ export async function processAttribution(saleId: string) {
     }
   }
 
+  // ConversationId match — very reliable Chatwoot link
+  if (bestScore < 100 && sale.conversationId) {
+    const convLead = await prisma.lead.findFirst({
+      where: { businessId: sale.businessId, conversationId: sale.conversationId },
+      orderBy: { createdAt: 'desc' }
+    });
+    if (convLead) {
+      bestLeadId = convLead.id;
+      bestScore = 95;
+      matchType = "conversation_id";
+    }
+  }
+
   if (bestScore < 100) {
     const leads = await prisma.lead.findMany({
       where: {
