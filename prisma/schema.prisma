@@ -214,3 +214,10 @@ model AdPerformance {
 
   @@unique([adId, date])
 }
+
+model DebugWebhook {
+  id        String   @id @default(cuid())
+  source    String
+  payload   String   @db.Text
+  createdAt DateTime @default(now())
+}
