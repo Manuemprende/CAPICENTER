@@ -578,24 +578,66 @@ async function startServer() {
       const body = req.body;
       const businessId = (req as any).businessId;
 
-      const attrs = { ...(body?.custom_attributes || {}), ...(body?.meta?.sender?.custom_attributes || {}) };
-      const phone = firstPresent(findField(body, ["phone", "telefono", "whatsapp", "celular", "contacto", "mobile", "numero", "waId"]), attrs?.phone, attrs?.telefono);
-      const customerName = firstPresent(findField(body, ["name", "nombre", "customer", "cliente", "user_name"]), body?.meta?.sender?.name, attrs?.name);
+      // Debug Capture
+      await prisma.debugWebhook.create({
+        data: { source: "leads", payload: JSON.stringify(body) }
+      }).catch(() => {});
+
+      // Robust attribute merging from all possible Chatwoot/n8n locations
+      const attrs = { 
+        ...(body?.custom_attributes || {}), 
+        ...(body?.meta?.sender?.custom_attributes || {}),
+        ...(body?.conversation?.custom_attributes || {}),
+        ...(body?.contact?.custom_attributes || {}),
+        ...(body?.meta?.sender?.custom_attributes || {})
+      };
+
+      const phone = firstPresent(
+        findField(body, ["phone", "telefono", "whatsapp", "celular", "contacto", "mobile", "numero", "waId"]), 
+        attrs?.phone, 
+        attrs?.telefono,
+        body?.meta?.sender?.phone_number,
+        body?.conversation?.contact?.phone_number
+      );
+
+      const customerName = firstPresent(
+        findField(body, ["name", "nombre", "customer", "cliente", "user_name"]), 
+        body?.meta?.sender?.name, 
+        attrs?.name,
+        body?.conversation?.contact?.name
+      );
+
       const stage = firstPresent(findField(body, ["stage", "etapa", "status", "estado"]), attrs?.stage);
       const conversationId = firstPresent(findField(body, ["conversationId", "idConversation", "id_conversacion", "id_chat", "conv_id"]), body?.conversation?.id);
       const country = firstPresent(findField(body, ["country", "pais", "nacion"]), attrs?.country, attrs?.pais, "CL");
       const whatsappId = firstPresent(findField(body, ["whatsappId", "waId", "wa_id", "inboxid"]), attrs?.whatsappId, attrs?.wa_id);
       
+      // Deep Search for Attribution Data
       const ctwaClid = firstPresent(
         findField(body, ["ctwaClid", "clid", "fbclid", "clickId", "external_id", "ctwa_clid"]), 
-        attrs?.ctwaClid, attrs?.ctwa_clid, body?.referral?.ctwa_clid
+        attrs?.ctwaClid, 
+        attrs?.ctwa_clid, 
+        body?.referral?.ctwa_clid,
+        body?.message?.referral?.ctwa_clid // Sometimes it's inside message
       );
-      const campaignId = firstPresent(findField(body, ["campaignId", "campId", "id_campana", "campaign_id"]), attrs?.campaignId, attrs?.campaign_id);
-      const campaignName = firstPresent(findField(body, ["campaignName", "campName", "nombre_campana", "campaign_name"]), attrs?.campaignName, attrs?.campaign_name);
-      const adsetId = firstPresent(findField(body, ["adsetId", "adset_id", "id_conjunto"]), attrs?.adsetId, attrs?.adset_id);
-      const adsetName = firstPresent(findField(body, ["adsetName", "adset_name", "nombre_conjunto"]), attrs?.adsetName, attrs?.adset_name);
-      const adId = firstPresent(findField(body, ["adId", "ad_id", "id_anuncio"]), attrs?.adId, attrs?.ad_id, body?.referral?.source_id);
-      const adName = firstPresent(findField(body, ["adName", "ad_name", "nombre_anuncio"]), attrs?.adName, attrs?.ad_name);
+
+      const adId = firstPresent(
+        findField(body, ["adId", "ad_id", "id_anuncio"]), 
+        attrs?.adId, 
+        attrs?.ad_id, 
+        body?.referral?.source_id,
+        body?.message?.referral?.source_id
+      );
+
+      const campaignName = firstPresent(
+        findField(body, ["campaignName", "campName", "nombre_campana", "campaign_name"]), 
+        attrs?.campaignName, 
+        attrs?.campaign_name,
+        body?.referral?.campaign_name
+      );
+
+      const adUrl = firstPresent(findField(body, ["adUrl", "ad_url"]), attrs?.adUrl, body?.referral?.source_url);
+      const adHeadline = firstPresent(findField(body, ["adHeadline", "ad_headline", "headline"]), attrs?.adHeadline, body?.referral?.headline);
 
       if (!phone) return res.status(400).json({ error: "Phone is required" });
 
@@ -705,10 +747,36 @@ async function startServer() {
       const body = req.body;
       const businessId = (req as any).businessId;
 
-      const attrs = { ...(body?.custom_attributes || {}), ...(body?.meta?.sender?.custom_attributes || {}), ...(body?.conversation?.custom_attributes || {}) };
-      const phone = firstPresent(findField(body, ["phone", "telefono", "whatsapp", "celular", "contacto", "mobile", "numero", "waId"]), attrs?.phone, attrs?.telefono);
+      // Debug Capture
+      await prisma.debugWebhook.create({
+        data: { source: "sales", payload: JSON.stringify(body) }
+      }).catch(() => {});
+
+      // Robust attribute merging from all possible Chatwoot/n8n locations
+      const attrs = { 
+        ...(body?.custom_attributes || {}), 
+        ...(body?.meta?.sender?.custom_attributes || {}), 
+        ...(body?.conversation?.custom_attributes || {}),
+        ...(body?.contact?.custom_attributes || {})
+      };
+
+      const phone = firstPresent(
+        findField(body, ["phone", "telefono", "whatsapp", "celular", "contacto", "mobile", "numero", "waId"]), 
+        attrs?.phone, 
+        attrs?.telefono,
+        body?.meta?.sender?.phone_number,
+        body?.conversation?.contact?.phone_number
+      );
+
       const amount = firstPresent(findField(body, ["amount", "value", "monto", "valor", "total", "precio", "monto_total", "venta"]), attrs?.amount, attrs?.monto, attrs?.value);
-      const customerName = firstPresent(findField(body, ["name", "nombre", "customer", "cliente", "user_name"]), body?.meta?.sender?.name, attrs?.name);
+      
+      const customerName = firstPresent(
+        findField(body, ["name", "nombre", "customer", "cliente", "user_name"]), 
+        body?.meta?.sender?.name, 
+        attrs?.name,
+        body?.conversation?.contact?.name
+      );
+
       const stage = firstPresent(findField(body, ["stage", "etapa", "status", "estado"]), attrs?.stage);
       const conversationId = firstPresent(findField(body, ["conversationId", "idConversation", "id_conversacion", "id_chat", "conv_id"]), body?.conversation?.id);
       const country = firstPresent(findField(body, ["country", "pais", "nacion"]), attrs?.country, attrs?.pais, "CL");
@@ -719,16 +787,28 @@ async function startServer() {
       const paymentStatus = firstPresent(findField(body, ["paymentStatus", "status", "estado", "pago_estado"]), attrs?.paymentStatus, "paid");
       
       const ctwaClid = firstPresent(
-        findField(body, ["ctwaClid", "clid", "fbclid", "clickId", "ctwa_clid"]), 
-        attrs?.ctwaClid, attrs?.ctwa_clid, body?.referral?.ctwa_clid
+        findField(body, ["ctwaClid", "clid", "fbclid", "clickId", "external_id", "ctwa_clid"]), 
+        attrs?.ctwaClid, 
+        attrs?.ctwa_clid, 
+        body?.referral?.ctwa_clid,
+        body?.message?.referral?.ctwa_clid
       );
-      const campaignId = firstPresent(findField(body, ["campaignId", "campId", "id_campana", "campaign_id"]), attrs?.campaignId, attrs?.campaign_id);
-      const campaignName = firstPresent(findField(body, ["campaignName", "campName", "nombre_campana", "campaign_name"]), attrs?.campaignName, attrs?.campaign_name);
-      const adsetId = firstPresent(findField(body, ["adsetId", "adset_id", "id_conjunto"]), attrs?.adsetId, attrs?.adset_id);
-      const adsetName = firstPresent(findField(body, ["adsetName", "adset_name", "nombre_conjunto"]), attrs?.adsetName, attrs?.adset_name);
-      const adId = firstPresent(findField(body, ["adId", "ad_id", "id_anuncio"]), attrs?.adId, attrs?.ad_id, body?.referral?.source_id);
-      const adName = firstPresent(findField(body, ["adName", "ad_name", "nombre_anuncio"]), attrs?.adName, attrs?.ad_name);
-      
+
+      const adId = firstPresent(
+        findField(body, ["adId", "ad_id", "id_anuncio"]), 
+        attrs?.adId, 
+        attrs?.ad_id, 
+        body?.referral?.source_id,
+        body?.message?.referral?.source_id
+      );
+
+      const campaignName = firstPresent(
+        findField(body, ["campaignName", "campName", "nombre_campana", "campaign_name"]), 
+        attrs?.campaignName, 
+        attrs?.campaign_name,
+        body?.referral?.campaign_name
+      );
+
       const adUrl = firstPresent(findField(body, ["adUrl", "ad_url"]), attrs?.adUrl, body?.referral?.source_url);
       const adHeadline = firstPresent(findField(body, ["adHeadline", "ad_headline", "headline"]), attrs?.adHeadline, body?.referral?.headline);
       const metaEventId = findField(body, ["metaEventId", "meta_event_id", "event_id"]);

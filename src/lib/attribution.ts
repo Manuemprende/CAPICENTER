@@ -125,9 +125,32 @@ export async function processAttribution(saleId: string) {
         matchType = type;
       }
     }
+
+    // Last resort: Name match if score is still 0
+    if (bestScore === 0 && sale.customerName) {
+       const nameLeads = await prisma.lead.findMany({
+         where: { 
+           businessId: sale.businessId, 
+           customerName: { contains: sale.customerName.split(' ')[0], mode: 'insensitive' } 
+         },
+         orderBy: { createdAt: 'desc' },
+         take: 5
+       });
+       for (const lead of nameLeads) {
+         if (lead.customerName && lead.customerName.toLowerCase().includes(sale.customerName.toLowerCase().split(' ')[0])) {
+           const diff = Math.abs(sale.createdAt.getTime() - lead.createdAt.getTime());
+           if (diff < 48 * 60 * 60 * 1000) {
+             bestScore = 60;
+             bestLeadId = lead.id;
+             matchType = "name_fuzzy";
+             break;
+           }
+         }
+       }
+    }
   }
 
-  if (bestLeadId && bestScore >= 70) {
+  if (bestLeadId && bestScore >= 60) {
     const lead = await prisma.lead.findUnique({ where: { id: bestLeadId } });
     if (lead) {
       const status = bestScore >= 95 ? 'strong_match' : 'attributed';
