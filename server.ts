@@ -550,10 +550,10 @@ async function startServer() {
   // existing typed webhook handlers so dedupe, attribution and CAPI stay aligned.
   app.post("/api/webhooks/n8n", validateApiKey, async (req, res) => {
     try {
-      // Debug Capture
-      await prisma.debugWebhook.create({
-        data: { source: "n8n", payload: JSON.stringify(req.body) }
-      }).catch(() => {});
+      // Debug Capture to Console
+      console.log("=== RAW WEBHOOK PAYLOAD ===");
+      console.log(JSON.stringify(req.body, null, 2));
+      console.log("===========================");
 
       const normalized = normalizeN8nPayload(req.body);
       const apiKey = String(req.headers["x-api-key"]);
@@ -584,9 +584,9 @@ async function startServer() {
       const businessId = (req as any).businessId;
 
       // Debug Capture
-      await prisma.debugWebhook.create({
-        data: { source: "leads", payload: JSON.stringify(body) }
-      }).catch(() => {});
+      console.log("=== RAW LEADS WEBHOOK PAYLOAD ===");
+      console.log(JSON.stringify(body, null, 2));
+      console.log("=================================");
 
       // Robust attribute merging from all possible Chatwoot/n8n locations
       const attrs = { 
@@ -756,9 +756,9 @@ async function startServer() {
       const businessId = (req as any).businessId;
 
       // Debug Capture
-      await prisma.debugWebhook.create({
-        data: { source: "sales", payload: JSON.stringify(body) }
-      }).catch(() => {});
+      console.log("=== RAW SALES WEBHOOK PAYLOAD ===");
+      console.log(JSON.stringify(body, null, 2));
+      console.log("=================================");
 
       // Robust attribute merging from all possible Chatwoot/n8n locations
       const attrs = { 
