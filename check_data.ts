@@ -2,11 +2,12 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function check() {
-  const leads = await prisma.lead.findMany({ take: 5, orderBy: { createdAt: 'desc' } });
+  const phone = '56934997488';
+  const leads = await prisma.lead.findMany({ where: { phoneNormalized: phone } });
   console.log('--- LEADS ---');
-  leads.forEach(l => console.log(`Phone: ${l.phone}, Normalized: ${l.phoneNormalized}, Campaign: ${l.campaignName}`));
+  leads.forEach(l => console.log(`Phone: ${l.phone}, Normalized: ${l.phoneNormalized}, Campaign: ${l.campaignName}, AdID: ${l.adId}`));
   
-  const sales = await prisma.sale.findMany({ take: 5, orderBy: { createdAt: 'desc' } });
+  const sales = await prisma.sale.findMany({ where: { phoneNormalized: phone } });
   console.log('--- SALES ---');
   sales.forEach(s => console.log(`Phone: ${s.phone}, Normalized: ${s.phoneNormalized}, Campaign: ${s.campaignName}`));
 }
